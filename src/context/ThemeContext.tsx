@@ -6,29 +6,34 @@ const THEME_KEY = 'aarambh_theme'
 const FONT_MODE_KEY = 'aarambh_font_mode'
 
 export type FontMode = 'small' | 'medium' | 'large'
-const FONT_SCALES: Record<FontMode, number> = { small: 0.84, medium: 1.0, large: 1.25 }
+const FONT_SCALES: Record<FontMode, number> = { small: 0.9, medium: 1.0, large: 1.15 }
 
 const darkColors = {
   ...lightColors,
-  background: '#101114',
-  bg: '#101114',
-  card: '#1a1c20',
-  white: '#1a1c20',
-  text: '#f4f4f5',
-  textMuted: '#c2c5cc',
-  textLight: 'rgba(194,197,204,0.72)',
-  secondary: '#b5bac5',
-  surfaceVariant: '#30333a',
-  surfaceContainer: '#24272d',
-  lightSurface: '#24272d',
-  border: '#30333a',
-  outline: '#8d7775',
-  outlineVariant: '#684846',
-  hairline: 'rgba(194,197,204,0.22)',
-  primarySoft: '#3b1d1f',
-  primarySoftBorder: '#684846',
-  dark: '#f4f4f5',
-  black: '#ffffff',
+  primary: '#FF5722', // मुख्य एक्शन कलर (Vibrant Orange)
+  primaryContainer: '#E64A19',
+  secondaryAction: '#00A859', // सेकेंडरी एक्शन कलर (Emerald Green)
+  highlightBlue: '#1E3A8A', // हाइलाइट/आइकन कलर (Navy Blue)
+  highlightBlueLight: '#2563EB',
+  background: '#121417',
+  bg: '#121417',
+  card: '#1A1C22',
+  white: '#1A1C22',
+  text: '#FFFFFF',
+  textMuted: '#94A3B8',
+  textLight: 'rgba(148,163,184,0.72)',
+  secondary: '#94A3B8',
+  surfaceVariant: '#252830',
+  surfaceContainer: '#1E2027',
+  lightSurface: '#1E2027',
+  border: '#282C35',
+  outline: '#475569',
+  outlineVariant: '#334155',
+  hairline: 'rgba(148,163,184,0.22)',
+  primarySoft: 'rgba(255, 87, 34, 0.15)',
+  primarySoftBorder: 'rgba(255, 87, 34, 0.35)',
+  dark: '#FFFFFF',
+  black: '#FFFFFF',
 }
 
 interface ThemeContextValue {
@@ -45,12 +50,13 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [mode, setModeState] = useState<'light' | 'dark'>('light')
+  const [mode, setModeState] = useState<'light' | 'dark'>('dark')
   const [fontMode, setFontModeState] = useState<FontMode>('medium')
 
   useEffect(() => {
     Promise.all([AsyncStorage.getItem(THEME_KEY), AsyncStorage.getItem(FONT_MODE_KEY), AsyncStorage.getItem('aarambh_font_scale')]).then(([savedTheme, savedMode, legacyScale]) => {
       if (savedTheme === 'dark' || savedTheme === 'light') setModeState(savedTheme)
+      else setModeState('dark')
       if (savedMode === 'small' || savedMode === 'medium' || savedMode === 'large') setFontModeState(savedMode)
       else if (legacyScale && Number(legacyScale) >= 1) setFontModeState('large')
     }).catch(() => {})

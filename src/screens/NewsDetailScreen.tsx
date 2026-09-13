@@ -7,7 +7,7 @@ import { useVideoPlayer, VideoView } from 'expo-video'
 import { useRoute, useNavigation } from '@react-navigation/native'
 import { commentApi, contentApi, interactionApi, reporterApi, userApi } from '../api/endpoints'
 import { ArticleBlock, CommentItem, ContentItem, ReporterPublicProfile } from '../types'
-import { colors, fonts, fontFor } from '../theme'
+import { colors, fonts, fontFor, radius } from '../theme'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import { ScaledText as Text } from '../components/ScaledText'
@@ -246,6 +246,7 @@ export default function NewsDetailScreen() {
     if (!id) return
     try {
       const fresh = await contentApi.get(id)
+      if (!fresh) return
       setItem(fresh)
       const [c, r] = await Promise.all([commentApi.list(id).catch(() => []), contentApi.related(fresh).catch(() => ({ data: [] as ContentItem[] }))])
       setComments(c)
@@ -386,6 +387,13 @@ export default function NewsDetailScreen() {
 
         <View style={styles.body}>
           <View style={styles.metaRow}>
+            {item.category?.name ? (
+              <View style={[styles.categoryBadgeWrap, { backgroundColor: isDark ? 'rgba(30, 58, 138, 0.35)' : '#EFF6FF', borderColor: isDark ? '#1E3A8A' : '#DBEAFE' }]}>
+                <Text style={[styles.categoryBadgeText, { color: isDark ? '#93C5FD' : '#1D4ED8' }]}>
+                  {item.category.name.hi || item.category.name.en}
+                </Text>
+              </View>
+            ) : null}
             {item.flags?.isBreaking ? <Text style={styles.breaking}>BREAKING</Text> : null}
           </View>
           {ytVideoId ? (
@@ -442,9 +450,14 @@ export default function NewsDetailScreen() {
               <Text style={[styles.bylineMeta, { color: themeColors.textMuted }]}>{item.publishedAt ? new Date(item.publishedAt).toLocaleString() : 'Recently'} · {item.location?.primary?.city || item.location?.primary?.state || 'India'}</Text>
               {(item.metrics?.views ?? 0) > 0 ? (
                 <View style={styles.viewCountRow}>
-                  <Ionicons name="eye-outline" size={13} color={themeColors.textMuted} />
-                  <Text style={[styles.bylineMeta, { color: themeColors.textMuted }]}>
-                    {item.metrics!.views! >= 1000 ? `${(item.metrics!.views! / 1000).toFixed(1)}k` : item.metrics!.views!} views
+                  <Ionicons
+                    name="eye-outline"
+                    size={14}
+                    color={isDark ? '#60A5FA' : '#2563EB'}
+                    style={styles.viewEyeIcon}
+                  />
+                  <Text style={[styles.viewCountText, { color: isDark ? '#93C5FD' : '#2563EB' }]}>
+                    {item.metrics!.views! >= 1000 ? `${(item.metrics!.views! / 1000).toFixed(1)}k` : item.metrics!.views!} {item.metrics!.views === 1 ? 'view' : 'views'}
                   </Text>
                 </View>
               ) : null}
@@ -543,7 +556,7 @@ export default function NewsDetailScreen() {
                   Reporter ID: {reporter.reporterId}
                 </Text>
               </View>
-              <Ionicons name="shield-checkmark-outline" size={20} color={themeColors.primary} />
+              <Ionicons name="shield-checkmark" size={20} color="#2563EB" />
             </View>
           ) : null}
         </View>
@@ -664,6 +677,19 @@ const styles = StyleSheet.create({
   focusPlaceholder: { width: 58, height: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 5, borderWidth: StyleSheet.hairlineWidth },
   body: { paddingHorizontal: 16, paddingBottom: 12 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  categoryBadgeWrap: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
+  categoryBadgeText: {
+    fontFamily: fonts.inter[700],
+    fontSize: 10.5,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
   breaking: { color: colors.primary, fontFamily: fonts.inter[700], fontSize: 11, letterSpacing: 0.5 },
   category: { color: colors.primaryDark, fontFamily: fonts.inter[600], fontSize: 13 },
   title: { fontFamily: fonts.serif[700], fontSize: 28, color: colors.text, lineHeight: 36, marginTop: 8 },
@@ -674,7 +700,17 @@ const styles = StyleSheet.create({
   bylineInfo: { marginLeft: 10, flex: 1 },
   author: { fontFamily: fonts.inter[600], fontSize: 13, fontWeight: '700', color: colors.text },
   bylineMeta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  viewCountRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  viewCountRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  viewEyeIcon: {
+    transform: [{ translateY: Platform.OS === 'android' ? 0.5 : 0 }],
+  },
+  viewCountText: {
+    fontFamily: fonts.inter[500],
+    fontSize: 11,
+    lineHeight: 15,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
   ytHeroWrap: { width: '100%', height: 230, borderRadius: 10, overflow: 'hidden', marginTop: 12, backgroundColor: '#000' },
   heroWrap: { position: 'relative', marginTop: 12, borderRadius: 10, overflow: 'hidden' },
   hero: { width: '100%', height: 250 },

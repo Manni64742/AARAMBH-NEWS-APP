@@ -1,9 +1,7 @@
 import { Platform } from 'react-native'
 
-const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost'
-
-export const API_URL = `http://${DEV_HOST}:5000/api/v1`
-export const API_BASE = `http://${DEV_HOST}:5000`
+export const API_BASE = 'https://api.neelamfoundation.in'
+export const API_URL = `${API_BASE}/api/v1`
 
 export const APP_NAME = 'Aarambh News'
 export const APP_TAGLINE = 'Hyperlocal News App'

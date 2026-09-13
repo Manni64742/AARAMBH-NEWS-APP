@@ -128,7 +128,7 @@ export default function OnboardingScreen({ navigation }: any) {
   return (
     <View style={[styles.safe, { backgroundColor: themeColors.background }]}>
       <AtmosphereBackground />
-      <View style={styles.brand}><Image source={require('../../AARAMBH_LOGO.png')} style={styles.brandLogo} contentFit="contain" /></View>
+      <View style={styles.brand}><Image source={require('../../assets/aarambh_news_logo.png')} style={styles.brandLogo} contentFit="contain" /></View>
       {step === 'INTERESTS' ? (
         <>
           <Text style={[styles.title, { color: themeColors.text }]}>Select your interests</Text>

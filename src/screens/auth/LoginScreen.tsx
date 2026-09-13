@@ -38,7 +38,7 @@ export default function LoginScreen({ navigation }: any) {
     <KeyboardAvoidingView style={[styles.flex, { backgroundColor: themeColors.background }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.logoWrap}>
-          <Image source={require('../../../AARAMBH_LOGO.png')} style={styles.logo} contentFit="contain" />
+          <Image source={require('../../../assets/aarambh_news_logo.png')} style={styles.logo} contentFit="contain" />
           <Text style={[styles.appName, { color: themeColors.text }]}>{APP_NAME}</Text>
           <Text style={[styles.tagline, { color: themeColors.textMuted }]}>{APP_TAGLINE}</Text>
         </View>

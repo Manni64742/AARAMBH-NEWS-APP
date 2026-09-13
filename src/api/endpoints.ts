@@ -1,16 +1,5 @@
+import { Platform } from 'react-native'
 import { client, uploadUrl, getToken } from './client'
-import {
-  USE_MOCK_DATA,
-  mockCategories,
-  mockComments,
-  mockContentGet,
-  mockContentList,
-  mockContentRelated,
-  mockLiveStreams,
-  mockLocationSearch,
-  mockReporter,
-  mockSearch,
-} from '../mock'
 import {
   ApiResponse,
   AuthResponse,
@@ -54,14 +43,46 @@ export const userApi = {
 }
 
 export const contentApi = {
-  list: async (params: Record<string, any>) =>
-    USE_MOCK_DATA ? mockContentList(params) : (await client.get<ApiResponse<ContentItem[]>>('/news', { params })).data,
-  feed: async (params: Record<string, any>) =>
-    USE_MOCK_DATA ? mockContentList(params) : (await client.get<ApiResponse<ContentItem[]>>('/news/feed', { params })).data,
-  get: async (identifier: string) =>
-    USE_MOCK_DATA
-      ? mockContentGet(identifier)
-      : (await client.get<ApiResponse<ContentItem>>(`/news/${identifier}`)).data.data,
+  list: async (params: Record<string, any>) => {
+    try {
+      return (await client.get<ApiResponse<ContentItem[]>>('/news', { params })).data
+    } catch (err) {
+      console.warn('Network error in contentApi.list:', err)
+      return { success: false, data: [] as ContentItem[], pagination: { total: 0, page: 1, limit: 10, totalPages: 1, hasNextPage: false, hasPrevPage: false } }
+    }
+  },
+  feed: async (params: Record<string, any>) => {
+    try {
+      return (await client.get<ApiResponse<ContentItem[]>>('/news/feed', { params })).data
+    } catch (err) {
+      console.warn('Network error in contentApi.feed:', err)
+      return { success: false, data: [] as ContentItem[], pagination: { total: 0, page: 1, limit: 10, totalPages: 1, hasNextPage: false, hasPrevPage: false } }
+    }
+  },
+  get: async (identifier: string) => {
+    try {
+      return (await client.get<ApiResponse<ContentItem>>(`/news/${identifier}`)).data.data
+    } catch (err) {
+      console.warn('Network error in contentApi.get:', err)
+      return null
+    }
+  },
+  homeBundles: async (language?: string) => {
+    try {
+      return (await client.get<ApiResponse<any>>('/news/home-bundles', { params: { language } })).data.data
+    } catch (err) {
+      console.warn('Network error in contentApi.homeBundles:', err)
+      return null
+    }
+  },
+  groupedLatest: async (params: { category?: string; language?: string }) => {
+    try {
+      return (await client.get<ApiResponse<any>>('/news/grouped-latest', { params })).data.data
+    } catch (err) {
+      console.warn('Network error in contentApi.groupedLatest:', err)
+      return null
+    }
+  },
   create: async (payload: Record<string, any>) =>
     (await client.post<ApiResponse<ContentItem>>('/news', payload)).data.data,
   update: async (id: string, payload: Record<string, any>) =>
@@ -69,23 +90,44 @@ export const contentApi = {
   recordView: async (id: string) =>
     (await client.post<ApiResponse<any>>(`/interactions/${id}/view`)).data,
   related: async (item: ContentItem) => {
-    if (USE_MOCK_DATA) return mockContentRelated(item)
-    const params: Record<string, any> = { limit: 10, status: 'PUBLISHED' }
-    if (item.category?._id) params.category = item.category._id
-    return (await client.get<ApiResponse<ContentItem[]>>('/news', { params })).data
+    try {
+      const params: Record<string, any> = { limit: 10, status: 'PUBLISHED' }
+      if (item.category?._id) params.category = item.category._id
+      return (await client.get<ApiResponse<ContentItem[]>>('/news', { params })).data
+    } catch {
+      return { success: false, data: [] as ContentItem[] }
+    }
   },
 }
 
 export const categoryApi = {
-  list: async () =>
-    USE_MOCK_DATA ? mockCategories('list') : (await client.get<ApiResponse<CategoryItem[]>>('/categories')).data.data,
-  tree: async () =>
-    USE_MOCK_DATA ? mockCategories('tree') : (await client.get<ApiResponse<CategoryItem[]>>('/categories/tree')).data.data,
+  list: async () => {
+    try {
+      return (await client.get<ApiResponse<CategoryItem[]>>('/categories')).data.data
+    } catch (err) {
+      console.warn('Network error in categoryApi.list:', err)
+      return [] as CategoryItem[]
+    }
+  },
+  tree: async () => {
+    try {
+      return (await client.get<ApiResponse<CategoryItem[]>>('/categories/tree')).data.data
+    } catch (err) {
+      console.warn('Network error in categoryApi.tree:', err)
+      return [] as CategoryItem[]
+    }
+  },
 }
 
 export const liveStreamApi = {
-  list: async () =>
-    USE_MOCK_DATA ? mockLiveStreams() : (await client.get<ApiResponse<LiveStreamItem[]>>('/live-streams')).data.data,
+  list: async () => {
+    try {
+      return (await client.get<ApiResponse<LiveStreamItem[]>>('/live-streams')).data.data
+    } catch (err) {
+      console.warn('Network error in liveStreamApi.list:', err)
+      return [] as LiveStreamItem[]
+    }
+  },
 }
 
 export const locationApi = {
@@ -97,28 +139,42 @@ export const locationApi = {
   localities: async (city: string) =>
     (await client.get<ApiResponse<LocationItem[]>>(`/locations/localities/${city}`)).data.data,
   search: async (q: string) =>
-    USE_MOCK_DATA
-      ? mockLocationSearch()
-      : (await client.get<ApiResponse<LocationItem[]>>('/locations/search', { params: { q } })).data.data,
+    (await client.get<ApiResponse<LocationItem[]>>('/locations/search', { params: { q } })).data.data,
 }
 
 export const searchApi = {
-  all: async (q: string, page = 1, limit = 20) =>
-    USE_MOCK_DATA
-      ? mockSearch(q, page, limit)
-      : (await client.get<ApiResponse<any>>('/search', { params: { q, page, limit } })).data,
+  all: async (q: string, page = 1, limit = 20) => {
+    try {
+      return (await client.get<ApiResponse<any>>('/search', { params: { q, page, limit } })).data
+    } catch (err) {
+      console.warn('Network error in searchApi.all:', err)
+      return { success: false, data: [] }
+    }
+  },
 }
 
 export const mediaApi = {
   upload: async (file: { uri: string; name: string; type: string }) => {
     const form = new FormData()
-    form.append('file', file as any)
+    if (Platform.OS === 'web' && file.uri.startsWith('blob:')) {
+      const resp = await fetch(file.uri)
+      const blob = await resp.blob()
+      form.append('file', new File([blob], file.name || 'upload.jpg', { type: file.type || blob.type }))
+    } else {
+      form.append('file', {
+        uri: file.uri,
+        name: file.name || 'upload.jpg',
+        type: file.type || 'image/jpeg',
+      } as any)
+    }
     const token = await getToken()
+    const headers: Record<string, string> = {}
+    if (token) headers.Authorization = `Bearer ${token}`
     return (
       await client.post<ApiResponse<{ url: string; filename: string; mimetype: string }>>(
         '/media/upload',
         form,
-        { headers: { 'Content-Type': 'multipart/form-data', Authorization: token ? `Bearer ${token}` : '' } }
+        { headers }
       )
     ).data.data
   },
@@ -150,6 +206,8 @@ export const followApi = {
 export const notificationApi = {
   list: async (page = 1, limit = 20) =>
     (await client.get<ApiResponse<NotificationItem[]>>(`/notifications?page=${page}&limit=${limit}`)).data,
+  publicList: async (page = 1, limit = 20) =>
+    (await client.get<ApiResponse<NotificationItem[]>>(`/notifications/public?page=${page}&limit=${limit}`)).data,
   preferences: async () => (await client.get<ApiResponse<any>>('/notifications/preferences')).data.data,
   updatePreferences: async (patch: Record<string, boolean>) =>
     (await client.put<ApiResponse<any>>('/notifications/preferences', patch)).data.data,
@@ -158,10 +216,14 @@ export const notificationApi = {
 }
 
 export const commentApi = {
-  list: async (contentId: string) =>
-    USE_MOCK_DATA
-      ? mockComments(contentId)
-      : (await client.get<ApiResponse<CommentItem[]>>(`/comments/${contentId}`)).data.data,
+  list: async (contentId: string) => {
+    try {
+      return (await client.get<ApiResponse<CommentItem[]>>(`/comments/${contentId}`)).data.data
+    } catch (err) {
+      console.warn('Network error in commentApi.list:', err)
+      return [] as CommentItem[]
+    }
+  },
   add: async (contentId: string, commentText: string) =>
     (await client.post<ApiResponse<CommentItem>>('/comments', { contentId, commentText })).data.data,
 }
@@ -176,10 +238,14 @@ export const reporterApi = {
   submitEkyc: async (payload: Record<string, any>) =>
     (await client.post<ApiResponse<ReporterProfile>>('/reporters/ekyc', payload)).data.data,
   card: async () => (await client.get<ApiResponse<ReporterProfile>>('/reporters/card')).data.data,
-  byUser: async (userId: string) =>
-    USE_MOCK_DATA
-      ? mockReporter(userId)
-      : (await client.get<ApiResponse<ReporterPublicProfile>>(`/reporters/by-user/${userId}`)).data.data,
+  byUser: async (userId: string) => {
+    try {
+      return (await client.get<ApiResponse<ReporterPublicProfile>>(`/reporters/by-user/${userId}`)).data.data
+    } catch (err) {
+      console.warn('Network error in reporterApi.byUser:', err)
+      return null
+    }
+  },
 }
 
 export { uploadUrl }

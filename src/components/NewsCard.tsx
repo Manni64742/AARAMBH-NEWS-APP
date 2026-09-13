@@ -1,5 +1,5 @@
 import React from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { Platform, Pressable, StyleSheet, View } from 'react-native'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { ContentItem } from '../types'
@@ -7,19 +7,35 @@ import { colors, fonts, fontFor, radius, spacing } from '../theme'
 import { mediaUrl } from '../config'
 import { ScaledText as Text } from './ScaledText'
 import { useTheme } from '../context/ThemeContext'
+import { useLanguage } from '../context/LanguageContext'
 
 const timeAgo = (iso?: string) => {
   if (!iso) return ''
   const diff = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'Just now'
-  if (mins < 60) return `${mins} min. ago`
+  if (mins < 60) return `${mins}m ago`
   const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs} hrs. ago`
+  if (hrs < 24) return `${hrs}h ago`
   const days = Math.floor(hrs / 24)
-  if (days < 7) return `${days} days ago`
+  if (days === 1) return '1 day ago'
+  if (days < 7) return `${days}d ago`
   const d = new Date(iso)
-  return `${d.toLocaleString('en-US', { month: 'short' })} ${d.getDate()}, ${d.getFullYear()}`
+  return `${d.toLocaleString('en-US', { month: 'short' })} ${d.getDate()}`
+}
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const days = Math.floor(h / 24)
+  if (days === 1) return '1 day ago'
+  if (days < 7) return `${days}d ago`
+  const d = new Date(iso)
+  return `${d.toLocaleString('en-US', { month: 'short' })} ${d.getDate()}`
 }
 
 export const NewsCard: React.FC<{
@@ -29,22 +45,30 @@ export const NewsCard: React.FC<{
   showThumb?: boolean
   onBookmark?: () => void
 }> = ({ item, onPress, compact, showThumb = true, onBookmark }) => {
-  const { colors: tc } = useTheme()
+  const { colors: tc, isDark } = useTheme()
+  const { language } = useLanguage()
   const image = mediaUrl(item.featuredImage?.url)
   const titleFont = fontFor(item.title, 700)
   const summaryFont = fontFor(item.summary, 400)
   const isBreaking = item.flags?.isBreaking
+
+  const categoryLabel =
+    language === 'hi'
+      ? (item.category?.name?.hi || item.category?.name?.en || 'समाचार')
+      : (item.category?.name?.en || item.category?.name?.hi || 'News')
 
   return (
     <Pressable onPress={onPress} style={[styles.card, { backgroundColor: tc.card, borderColor: tc.border }]}>
       <View style={styles.cardInner}>
         {/* Category + Breaking row */}
         <View style={styles.categoryRow}>
-          <Text style={[styles.categoryLabel, { color: tc.primaryDark }]}>
-            {(item.category?.name?.en || 'News').toUpperCase()}
-          </Text>
+          <View style={[styles.categoryBadgeWrap, { backgroundColor: isDark ? 'rgba(30, 58, 138, 0.35)' : '#EFF6FF', borderColor: isDark ? '#1E3A8A' : '#DBEAFE' }]}>
+            <Text style={[styles.categoryLabel, { color: isDark ? '#93C5FD' : '#1D4ED8' }]}>
+              {categoryLabel}
+            </Text>
+          </View>
           {isBreaking ? (
-            <View style={styles.breakingBadge}>
+            <View style={[styles.breakingBadge, { backgroundColor: tc.primary }]}>
               <View style={styles.breakingDotSmall} />
               <Text style={styles.breakingBadgeText}>BREAKING</Text>
             </View>
@@ -76,17 +100,29 @@ export const NewsCard: React.FC<{
         {/* Bottom row: author + time + views + bookmark */}
         <View style={styles.metaRow}>
           <View style={styles.metaLeft}>
-            <Text style={[styles.metaText, { color: tc.secondary }]} numberOfLines={1}>
+            <Text
+              style={[styles.metaText, styles.authorText, { color: tc.secondary }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {item.author?.name || 'Aarambh News'}
             </Text>
             <Text style={[styles.metaDot, { color: tc.secondary }]}>·</Text>
-            <Text style={[styles.metaText, { color: tc.secondary }]}>
+            <Text
+              style={[styles.metaText, styles.timeText, { color: tc.secondary }]}
+              numberOfLines={1}
+            >
               {timeAgo(item.publishedAt)}
             </Text>
           </View>
           <View style={styles.metaRight}>
-            <Ionicons name="eye-outline" size={13} color={tc.secondary} />
-            <Text style={[styles.viewCount, { color: tc.secondary }]}>
+            <Ionicons
+              name="eye-outline"
+              size={13.5}
+              color={isDark ? '#60A5FA' : '#2563EB'}
+              style={styles.eyeIcon}
+            />
+            <Text style={[styles.viewCount, { color: tc.secondary }]} numberOfLines={1}>
               {(item.metrics?.views || 0).toLocaleString()}
             </Text>
             {onBookmark ? (
@@ -111,7 +147,7 @@ export const HorizontalNewsCard: React.FC<{
   onPress: () => void
   width?: number
 }> = ({ item, onPress, width = 300 }) => {
-  const { colors: tc } = useTheme()
+  const { colors: tc, isDark } = useTheme()
   const image = mediaUrl(item.featuredImage?.url)
   return (
     <Pressable
@@ -124,9 +160,11 @@ export const HorizontalNewsCard: React.FC<{
         <View style={[styles.hImage, styles.hImageFallback]} />
       )}
       <View style={styles.hBody}>
-        <Text style={[styles.categoryLabel, { color: tc.primaryDark }]}>
-          {item.category?.name?.en || 'News'}
-        </Text>
+        <View style={[styles.categoryBadgeWrap, { backgroundColor: isDark ? 'rgba(30, 58, 138, 0.35)' : '#EFF6FF', borderColor: isDark ? '#1E3A8A' : '#DBEAFE', alignSelf: 'flex-start', marginBottom: 5 }]}>
+          <Text style={[styles.categoryLabel, { color: isDark ? '#93C5FD' : '#1D4ED8' }]}>
+            {item.category?.name?.hi || item.category?.name?.en || 'News'}
+          </Text>
+        </View>
         <Text
           style={[styles.hTitle, { color: tc.text, fontFamily: fontFor(item.title, 700) }]}
           numberOfLines={3}
@@ -145,7 +183,7 @@ export const CategoryChip: React.FC<{
   onPress: () => void
   style?: any
   textStyle?: any
-}> = ({ label, active, onPress, style, textStyle }) => {
+}> = ({ label, active = false, onPress, style, textStyle }) => {
   const { colors: tc } = useTheme()
   return (
     <Pressable
@@ -153,7 +191,7 @@ export const CategoryChip: React.FC<{
       style={[
         styles.chip,
         {
-          backgroundColor: active ? tc.primary : tc.lightSurface,
+          backgroundColor: active ? tc.primary : tc.surfaceVariant,
           borderColor: active ? tc.primary : tc.border,
         },
         style,
@@ -162,7 +200,8 @@ export const CategoryChip: React.FC<{
       <Text
         style={[
           styles.chipText,
-          { color: active ? '#fff' : tc.textMuted },
+          { color: active ? '#ffffff' : tc.textMuted },
+          active && { fontFamily: fonts.inter[700], color: '#ffffff' },
           textStyle,
         ]}
       >
@@ -185,11 +224,13 @@ export const SectionHeader: React.FC<{
   return (
     <View style={styles.sectionHeader}>
       <View style={styles.sectionTitleRow}>
-        <Text style={[styles.sectionTitle, { color: tc.text }]}>{title}</Text>
+        <Text style={[styles.sectionTitle, { color: tc.text }]} numberOfLines={1} ellipsizeMode="tail">
+          {title}
+        </Text>
         {showLiveBadge ? (
-          <View style={styles.liveBadge}>
+          <View style={[styles.liveBadge, { backgroundColor: tc.primary }]}>
             <View style={styles.liveBadgeDot} />
-            <Text style={styles.liveBadgeText}>LIVE FEED</Text>
+            <Text style={styles.liveBadgeText}>LIVE</Text>
           </View>
         ) : null}
       </View>
@@ -201,8 +242,9 @@ export const SectionHeader: React.FC<{
           </Pressable>
         ) : null}
         {action && onAction ? (
-          <Pressable onPress={onAction}>
-            <Text style={[styles.sectionAction, { color: tc.primaryDark }]}>{action}</Text>
+          <Pressable onPress={onAction} style={styles.actionRow}>
+            <Text style={[styles.sectionAction, { color: tc.primary }]}>{action}</Text>
+            <Ionicons name="arrow-forward" size={13} color={tc.primary} />
           </Pressable>
         ) : null}
       </View>
@@ -229,12 +271,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     gap: spacing.sm,
   },
+  categoryBadgeWrap: {
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
   categoryLabel: {
     fontFamily: fonts.inter[700],
-    fontSize: 10,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    color: colors.primaryDark,
+    fontSize: 9.5,
+    letterSpacing: 0.5,
   },
   breakingBadge: {
     flexDirection: 'row',
@@ -276,12 +323,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 6,
+    overflow: 'hidden',
   },
   metaLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
     gap: 4,
+    marginRight: 8,
+    minWidth: 0,
+  },
+  authorText: {
+    flexShrink: 1,
   },
   metaText: {
     fontFamily: fonts.inter[500],
@@ -292,16 +345,27 @@ const styles = StyleSheet.create({
     fontFamily: fonts.inter[500],
     fontSize: 11,
     color: colors.secondary,
+    flexShrink: 0,
+  },
+  timeText: {
+    flexShrink: 0,
   },
   metaRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3.5,
+    flexShrink: 0,
+  },
+  eyeIcon: {
+    transform: [{ translateY: Platform.OS === 'android' ? 0.5 : 0 }],
   },
   viewCount: {
     fontFamily: fonts.inter[500],
     fontSize: 11,
+    lineHeight: 14,
     color: colors.secondary,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   bookmarkBtn: { marginLeft: 6, padding: 2 },
   thumb: {
@@ -368,11 +432,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     flex: 1,
+    marginRight: 8,
   },
   sectionTitle: {
     fontFamily: fonts.serif[700],
-    fontSize: 20,
+    fontSize: 18.5,
     color: colors.text,
+    flexShrink: 1,
   },
   liveBadge: {
     flexDirection: 'row',
@@ -409,6 +475,11 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: radius.pill,
     gap: 4,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
   filterChipText: {
     fontFamily: fonts.inter[500],

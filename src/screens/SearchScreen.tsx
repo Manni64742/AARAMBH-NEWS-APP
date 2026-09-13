@@ -138,7 +138,7 @@ export default function SearchScreen({ navigation }: any) {
 
         <View style={styles.searchRow}>
           <View style={[styles.inputWrap, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
-            <Ionicons name="search" size={18} color={themeColors.textMuted} />
+            <Ionicons name="search" size={18} color={isDark ? '#60A5FA' : '#2563EB'} />
             <TextInput
               style={[styles.input, { color: themeColors.text }]}
               value={query}

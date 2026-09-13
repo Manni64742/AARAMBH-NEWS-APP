@@ -58,7 +58,7 @@ export default function LiveNewsScreen({ navigation }: any) {
     setError(null)
     try {
       const list = await liveStreamApi.list()
-      setItems(list.sort((a, b) => (a.status === 'LIVE' ? -1 : 1)))
+      setItems(list.sort((a: LiveStreamItem, b: LiveStreamItem) => (a.status === 'LIVE' ? -1 : 1)))
     } catch {
       setError('Failed to load live streams')
     } finally {

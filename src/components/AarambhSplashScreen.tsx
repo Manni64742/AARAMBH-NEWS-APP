@@ -74,7 +74,7 @@ export function AarambhSplashScreen({
           ]}
         >
           <Image
-            source={require('../../AARAMBH_LOGO.png')}
+            source={require('../../assets/aarambh_news_logo.png')}
             style={styles.logo}
             contentFit="contain"
           />

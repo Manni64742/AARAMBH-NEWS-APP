@@ -14,14 +14,42 @@ import {
   NotoSansDevanagari_700Bold,
 } from '@expo-google-fonts/noto-sans-devanagari'
 import { AuthProvider } from './src/context/AuthContext'
+import { LanguageProvider } from './src/context/LanguageContext'
 import { LocationProvider } from './src/context/LocationContext'
 import { ToastProvider } from './src/context/ToastContext'
 import { ThemeProvider, useTheme } from './src/context/ThemeContext'
-import RootNavigator from './src/navigation/RootNavigator'
+import RootNavigator, { navigateToNewsDetail } from './src/navigation/RootNavigator'
 import { AarambhSplashScreen } from './src/components/AarambhSplashScreen'
+import * as Notifications from 'expo-notifications'
+import { registerForPushNotificationsAsync, checkForNewBreakingNews } from './src/services/notificationService'
 
 function AppContent() {
   const { isDark } = useTheme()
+
+  React.useEffect(() => {
+    // 1. Register device for push notifications
+    registerForPushNotificationsAsync().catch(() => {})
+
+    // 2. Listen for clicks on Android notification tray / slider
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data
+      const contentId = data?.contentId
+      if (contentId) {
+        navigateToNewsDetail(String(contentId))
+      }
+    })
+
+    // 3. Check for new breaking news periodically
+    checkForNewBreakingNews().catch(() => {})
+    const interval = setInterval(() => {
+      checkForNewBreakingNews().catch(() => {})
+    }, 30000)
+
+    return () => {
+      sub.remove()
+      clearInterval(interval)
+    }
+  }, [])
 
   return (
     <>
@@ -46,15 +74,17 @@ export default function App() {
       <SafeAreaProvider>
         <ThemeProvider>
           <AuthProvider>
-            <LocationProvider>
-              <ToastProvider>
-                {!fontsLoaded ? (
-                  <AarambhSplashScreen isReady={false} />
-                ) : (
-                  <AppContent />
-                )}
-              </ToastProvider>
-            </LocationProvider>
+            <LanguageProvider>
+              <LocationProvider>
+                <ToastProvider>
+                  {!fontsLoaded ? (
+                    <AarambhSplashScreen isReady={false} />
+                  ) : (
+                    <AppContent />
+                  )}
+                </ToastProvider>
+              </LocationProvider>
+            </LanguageProvider>
           </AuthProvider>
         </ThemeProvider>
       </SafeAreaProvider>

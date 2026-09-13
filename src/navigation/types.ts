@@ -19,17 +19,20 @@ export type RootStackParamList = {
   Login: undefined
   Register: undefined
   Main: NavigatorScreenParams<MainTabParamList>
+  LanguageSelect: undefined
   Onboarding: undefined
   Saved: undefined
   NewsDetail: { item: ContentItem }
   NewsDetailById: { id: string }
   CategoryNews: { categoryId: string; subCategoryId?: string; title: string }
+  CategoryNewsList: { title: string; sectionTitle?: string; items: any[] }
   Search: undefined
   Bookmarks: undefined
   Favorites: undefined
   Notifications: undefined
   History: undefined
   Settings: undefined
+  LanguageSettings: undefined
   LocationPicker: undefined
   AudioPlayer: undefined
   Categories: undefined

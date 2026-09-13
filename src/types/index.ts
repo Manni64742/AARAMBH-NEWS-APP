@@ -92,6 +92,8 @@ export interface ContentItem {
   featuredImage?: { url: string; caption?: string; alt?: string; credit?: string }
   flags?: { isBreaking?: boolean; isFeatured?: boolean }
   metrics?: { views?: number; uniqueViewers?: number; likes?: number; shares?: number; comments?: number }
+  viewsCount?: number
+  likesCount?: number
   trendingScore?: number
   publishedAt?: string
   createdAt: string

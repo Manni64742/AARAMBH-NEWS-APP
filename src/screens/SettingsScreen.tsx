@@ -10,13 +10,16 @@ import { useToast } from '../context/ToastContext'
 import { errorMessage } from '../api/client'
 import { SUPPORTED_LANGUAGES } from '../config'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage, AppLanguage } from '../context/LanguageContext'
 import { ScaledText as Text } from '../components/ScaledText'
 import { AarambhLoader } from '../components/AarambhLoader'
+import { Ionicons } from '@expo/vector-icons'
 
 const GUEST_NOTIFICATIONS_KEY = 'aarambh_guest_notifications'
 
 export default function SettingsScreen({ navigation }: any) {
   const { user } = useAuth()
+  const { language, setLanguage } = useLanguage()
   const { colors, fontMode, setFontMode, isDark, toggleTheme } = useTheme()
   const { success, error } = useToast()
   const [prefs, setPrefs] = useState<UserPreferences | null>(null)
@@ -137,30 +140,6 @@ export default function SettingsScreen({ navigation }: any) {
         </View>
       </View>
 
-      <Text style={[styles.section, { color: colors.text }]}>Language</Text>
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {SUPPORTED_LANGUAGES.map((language, idx) => (
-          <React.Fragment key={language.code}>
-            <Pressable
-              style={styles.row}
-              onPress={() => {
-                const languages = prefs?.languages?.includes(language.code)
-                  ? prefs.languages.filter((item) => item !== language.code)
-                  : [...(prefs?.languages || []), language.code]
-                setPrefs((current) => (current ? { ...current, languages } : current))
-                if (user) userApi.updatePreferences({ languages }).then(() => success('Language updated')).catch(() => {})
-              }}
-            >
-              <Text style={[styles.rowText, { color: colors.text }]}>{language.label}</Text>
-              {prefs?.languages?.includes(language.code) ? <Text style={styles.check}>✓</Text> : null}
-            </Pressable>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          </React.Fragment>
-        ))}
-        <Text style={[styles.note, { color: colors.textLight, paddingVertical: 8 }]}>
-          Hindi + English initially; more languages supported by the platform.
-        </Text>
-      </View>
 
       {user ? (
         <>

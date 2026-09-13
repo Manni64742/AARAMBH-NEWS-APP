@@ -20,30 +20,31 @@ const iconFor: Record<string, string> = {
   REPORTER_STATUS: '🪪',
 }
 
+import { markAllNotificationsSeen } from '../services/notificationService'
+
 export default function NotificationsScreen({ navigation }: any) {
   const { colors: themeColors } = useTheme()
   const { user } = useAuth()
   const load = useCallback(async (page: number) => {
-    const res = await notificationApi.list(page, 20)
-    return { data: res.data, pagination: res.pagination }
-  }, [])
+    try {
+      const res = user
+        ? await notificationApi.list(page, 20)
+        : await notificationApi.publicList(page, 20)
+      return { data: res.data || [], pagination: res.pagination }
+    } catch {
+      return { data: [], pagination: undefined }
+    }
+  }, [user])
   const feed = usePagedFeed<NotificationItem>({ load })
 
   useEffect(() => {
+    markAllNotificationsSeen().catch(() => {})
     if (user) notificationApi.markAllRead().catch(() => {})
   }, [user])
 
   const open = async (item: NotificationItem) => {
-    await notificationApi.markRead(item._id).catch(() => {})
+    if (user) await notificationApi.markRead(item._id).catch(() => {})
     if (item.contentId) navigation.push('NewsDetailById', { id: item.contentId })
-  }
-
-  if (!user) {
-    return (
-      <View style={[styles.safe, { backgroundColor: themeColors.background }]}>
-        <EmptyState title="Login to see notifications" icon="🔕" />
-      </View>
-    )
   }
 
   const topPadding = 12

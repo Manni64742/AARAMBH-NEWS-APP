@@ -7,11 +7,13 @@ import { useAuth } from '../context/AuthContext'
 import { useLocation } from '../context/LocationContext'
 import { interactionApi, notificationApi, reporterApi, userApi } from '../api/endpoints'
 import { useTheme } from '../context/ThemeContext'
+import { useLanguage } from '../context/LanguageContext'
 import { colors, fonts, fontFor } from '../theme'
 import { ScaledText as Text } from '../components/ScaledText'
 
 export default function ProfileScreen({ navigation }: any) {
   const { user, isReporter, logout } = useAuth()
+  const { language } = useLanguage()
   const { current: location } = useLocation()
   const { colors, fontMode, setFontMode, isDark, toggleTheme } = useTheme()
   const insets = useSafeAreaInsets()
@@ -59,14 +61,56 @@ export default function ProfileScreen({ navigation }: any) {
           <Pressable style={styles.guestBtnAlt} onPress={() => navigation.navigate('Register')}>
             <Text style={styles.guestBtnAltText}>Create Profile</Text>
           </Pressable>
-          <Text style={[styles.guestSection, { color: colors.textMuted }]}>General settings</Text>
+          <Text style={[styles.guestSection, { color: colors.textMuted }]}>
+            {language === 'hi' ? 'सामान्य सेटिंग्स' : 'General settings'}
+          </Text>
           <View style={[styles.guestCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-            <View style={styles.fontRow}><Ionicons name="text-outline" size={20} color={colors.primary} /><Text style={[styles.menuText, { color: colors.text }]}>Font size</Text><Text style={[styles.sizeValue, { color: colors.textMuted }]}>{fontMode}</Text></View>
+            <View style={styles.fontRow}>
+              <Ionicons name="text-outline" size={20} color={colors.primary} />
+              <Text style={[styles.menuText, { color: colors.text }]}>
+                {language === 'hi' ? 'फॉन्ट साइज़' : 'Font size'}
+              </Text>
+              <Text style={[styles.sizeValue, { color: colors.textMuted }]}>{fontMode}</Text>
+            </View>
             <Slider minimumValue={0} maximumValue={2} step={1} value={fontMode === 'small' ? 0 : fontMode === 'medium' ? 1 : 2} onValueChange={(value) => setFontMode(value === 0 ? 'small' : value === 1 ? 'medium' : 'large')} minimumTrackTintColor={colors.primary} maximumTrackTintColor={colors.surfaceVariant} thumbTintColor={colors.primary} style={styles.slider} />
             <View style={styles.sliderLabels}><Text style={styles.sliderLabel}>Small</Text><Text style={styles.sliderLabel}>Medium</Text><Text style={styles.sliderLabel}>Large</Text></View>
-            <Pressable style={styles.menuRow} onPress={toggleTheme}><Ionicons name={isDark ? 'moon' : 'sunny-outline'} size={20} color={colors.primary} /><Text style={[styles.menuText, { color: colors.text }]}>Display mode</Text><Text style={[styles.modeValue, { color: colors.textMuted }]}>{isDark ? 'Dark' : 'Light'}</Text></Pressable>
-            <Pressable style={styles.menuRow} onPress={() => navigation.navigate('Settings')}><Ionicons name="notifications-outline" size={20} color={colors.textMuted} /><Text style={[styles.menuText, { color: colors.text }]}>Notification settings</Text><Ionicons name="chevron-forward" size={18} color={colors.textLight} /></Pressable>
-            <Pressable style={styles.menuRow} onPress={() => navigation.navigate('LocationPicker')}><Ionicons name="location-outline" size={20} color={colors.textMuted} /><Text style={[styles.menuText, { color: colors.text }]}>Location settings</Text><Ionicons name="chevron-forward" size={18} color={colors.textLight} /></Pressable>
+            
+            <Pressable style={styles.menuRow} onPress={toggleTheme}>
+              <Ionicons name={isDark ? 'moon' : 'sunny-outline'} size={20} color={colors.primary} />
+              <Text style={[styles.menuText, { color: colors.text }]}>
+                {language === 'hi' ? 'डिस्प्ले मोड' : 'Display mode'}
+              </Text>
+              <Text style={[styles.modeValue, { color: colors.textMuted }]}>{isDark ? 'Dark' : 'Light'}</Text>
+            </Pressable>
+            
+            <Pressable style={styles.menuRow} onPress={() => navigation.navigate('Settings')}>
+              <Ionicons name="notifications-outline" size={20} color={colors.textMuted} />
+              <Text style={[styles.menuText, { color: colors.text }]}>
+                {language === 'hi' ? 'नोटिफिकेशन सेटिंग्स' : 'Notification settings'}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
+            </Pressable>
+            
+            <Pressable style={styles.menuRow} onPress={() => navigation.navigate('LocationPicker')}>
+              <Ionicons name="location-outline" size={20} color={colors.textMuted} />
+              <Text style={[styles.menuText, { color: colors.text }]}>
+                {language === 'hi' ? 'लोकेशन सेटिंग्स' : 'Location settings'}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
+            </Pressable>
+
+            <Pressable style={styles.menuRow} onPress={() => navigation.navigate('LanguageSettings')}>
+              <Ionicons name="language-outline" size={20} color={colors.textMuted} />
+              <Text style={[styles.menuText, { color: colors.text }]}>
+                {language === 'hi' ? 'भाषा सेटिंग्स' : 'Language settings'}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '700' }}>
+                  {language === 'hi' ? 'हिन्दी' : 'English'}
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
+              </View>
+            </Pressable>
           </View>
         </ScrollView>
       </View>
@@ -74,13 +118,14 @@ export default function ProfileScreen({ navigation }: any) {
   }
 
   const menu: Array<{ icon: any; label: string; route: string }> = [
-    { icon: 'bookmark-outline', label: 'Saved / Bookmarks', route: 'Saved' },
-    { icon: 'star-outline', label: 'My Favorites', route: 'Favorites' },
-    { icon: 'notifications-outline', label: 'Notifications', route: 'Notifications' },
-    { icon: 'time-outline', label: 'Reading History', route: 'History' },
-    { icon: 'headset-outline', label: 'Audio News', route: 'AudioPlayer' },
-    { icon: 'location-outline', label: 'Change Location', route: 'LocationPicker' },
-    { icon: 'settings-outline', label: 'My Interests & Settings', route: 'Settings' },
+    { icon: 'bookmark-outline', label: language === 'hi' ? 'सहेजे गए / बुकमार्क' : 'Saved / Bookmarks', route: 'Saved' },
+    { icon: 'star-outline', label: language === 'hi' ? 'पसंदीदा' : 'My Favorites', route: 'Favorites' },
+    { icon: 'notifications-outline', label: language === 'hi' ? 'नोटिफिकेशन सेटिंग्स' : 'Notification settings', route: 'Settings' },
+    { icon: 'location-outline', label: language === 'hi' ? 'लोकेशन सेटिंग्स' : 'Location settings', route: 'LocationPicker' },
+    { icon: 'language-outline', label: language === 'hi' ? 'भाषा सेटिंग्स' : 'Language settings', route: 'LanguageSettings' },
+    { icon: 'time-outline', label: language === 'hi' ? 'रीडिंग हिस्ट्री' : 'Reading History', route: 'History' },
+    { icon: 'headset-outline', label: language === 'hi' ? 'ऑडियो समाचार' : 'Audio News', route: 'AudioPlayer' },
+    { icon: 'settings-outline', label: language === 'hi' ? 'मेरी रुचियां व सेटिंग्स' : 'My Interests & Settings', route: 'Settings' },
   ]
 
   const reporterMenu: Array<{ icon: any; label: string; route: string }> = [
@@ -161,12 +206,22 @@ export default function ProfileScreen({ navigation }: any) {
           ))}
         </View>
 
-        <Text style={styles.section}>Reading preferences</Text>
+        <Text style={styles.section}>{language === 'hi' ? 'रीडिंग व सामान्य सेटिंग्स' : 'Reading & General Preferences'}</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.fontRow}><Ionicons name="text-outline" size={20} color={colors.primary} /><Text style={[styles.menuText, { color: colors.text }]}>Font size</Text><Text style={[styles.sizeValue, { color: colors.textMuted }]}>{fontMode}</Text></View>
+          <View style={styles.fontRow}><Ionicons name="text-outline" size={20} color={colors.primary} /><Text style={[styles.menuText, { color: colors.text }]}>{language === 'hi' ? 'फॉन्ट साइज़' : 'Font size'}</Text><Text style={[styles.sizeValue, { color: colors.textMuted }]}>{fontMode}</Text></View>
           <Slider minimumValue={0} maximumValue={2} step={1} value={fontMode === 'small' ? 0 : fontMode === 'medium' ? 1 : 2} onValueChange={(value) => setFontMode(value === 0 ? 'small' : value === 1 ? 'medium' : 'large')} minimumTrackTintColor={colors.primary} maximumTrackTintColor={colors.surfaceVariant} thumbTintColor={colors.primary} style={styles.slider} />
           <View style={styles.sliderLabels}><Text style={styles.sliderLabel}>Small</Text><Text style={styles.sliderLabel}>Medium</Text><Text style={styles.sliderLabel}>Large</Text></View>
-          <Pressable style={styles.menuRow} onPress={toggleTheme}><Ionicons name={isDark ? 'moon' : 'sunny-outline'} size={20} color={colors.primary} /><Text style={[styles.menuText, { color: colors.text }]}>Display mode</Text><Text style={[styles.modeValue, { color: colors.textMuted }]}>{isDark ? 'Dark' : 'Light'}</Text></Pressable>
+          <Pressable style={styles.menuRow} onPress={toggleTheme}><Ionicons name={isDark ? 'moon' : 'sunny-outline'} size={20} color={colors.primary} /><Text style={[styles.menuText, { color: colors.text }]}>{language === 'hi' ? 'डिस्प्ले मोड' : 'Display mode'}</Text><Text style={[styles.modeValue, { color: colors.textMuted }]}>{isDark ? 'Dark' : 'Light'}</Text></Pressable>
+          <Pressable style={styles.menuRow} onPress={() => navigation.navigate('LanguageSettings')}>
+            <Ionicons name="language-outline" size={20} color={colors.textMuted} />
+            <Text style={[styles.menuText, { color: colors.text }]}>{language === 'hi' ? 'भाषा सेटिंग्स' : 'Language settings'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '700' }}>
+                {language === 'hi' ? 'हिन्दी' : 'English'}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
+            </View>
+          </Pressable>
         </View>
 
         <Pressable style={styles.logoutBtn} onPress={logout}>

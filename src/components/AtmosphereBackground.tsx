@@ -20,7 +20,7 @@ export function AtmosphereBackground() {
     <View style={styles.container} pointerEvents="none">
       <View style={styles.watermarkWrap}>
         <Image
-          source={require('../../assets/aarambh_watermark.png')}
+          source={require('../../assets/aarambh_news_watermarklogo.png')}
           style={[
             styles.watermarkImage,
             {

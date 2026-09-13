@@ -6,9 +6,12 @@ import { Platform, TextStyle } from 'react-native'
  */
 
 export const colors = {
-  primary: '#91000a',
-  primaryContainer: '#b71c1c',
+  primary: '#FF5722', // Aarambh Vibrant Orange (मुख्य एक्शन कलर)
+  primaryContainer: '#E64A19',
   onPrimary: '#ffffff',
+  secondaryAction: '#00A859', // Secondary Emerald Green (सेकेंडरी एक्शन कलर)
+  highlightBlue: '#1E3A8A', // Deep Navy / Royal Blue (हाइलाइट / आइकन कलर)
+  highlightBlueLight: '#2563EB',
   background: '#faf9fb',
   text: '#1b1c1e',
   secondary: '#545f73',
@@ -19,15 +22,15 @@ export const colors = {
   outline: '#8f706c',
   outlineVariant: '#e4beb9',
   error: '#ba1a1a',
-  success: '#2e7d32',
-  warning: '#9a5b00',
-  dark: '#1b1c1e',
+  success: '#00A859',
+  warning: '#f59e0b',
+  dark: '#121417',
   black: '#000000',
 
-  primarySoft: '#f8ecec',
-  primarySoftBorder: '#e4beb9',
-  successSoft: '#e8f3ea',
-  warningSoft: '#fdf4e1',
+  primarySoft: 'rgba(255, 87, 34, 0.12)',
+  primarySoftBorder: 'rgba(255, 87, 34, 0.3)',
+  successSoft: '#e8f5e9',
+  warningSoft: '#fef3c7',
   errorSoft: '#fbeaea',
 
   hairline: 'rgba(84,95,115,0.22)',
@@ -39,7 +42,7 @@ export const colors = {
   card: '#ffffff',
   border: '#e3e2e4',
   textMuted: '#545f73',
-  primaryDark: '#7d0009',
+  primaryDark: '#E64A19',
   danger: '#ba1a1a',
 }
 

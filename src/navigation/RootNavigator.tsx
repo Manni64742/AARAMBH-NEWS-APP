@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native'
-import { NavigationContainer } from '@react-navigation/native'
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native'
 import { createNativeStackNavigator, NativeStackHeaderProps } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -24,6 +24,7 @@ import SavedScreen from '../screens/SavedScreen'
 import ProfileScreen from '../screens/ProfileScreen'
 import NewsDetailScreen from '../screens/NewsDetailScreen'
 import CategoryNewsScreen from '../screens/CategoryNewsScreen'
+import CategoryNewsListScreen from '../screens/CategoryNewsListScreen'
 import SearchScreen from '../screens/SearchScreen'
 import BookmarksScreen from '../screens/BookmarksScreen'
 import FavoritesScreen from '../screens/FavoritesScreen'
@@ -42,11 +43,22 @@ import ReporterProfileScreen from '../screens/reporter/ReporterProfileScreen'
 import EkycScreen from '../screens/reporter/EkycScreen'
 import ReporterCardScreen from '../screens/reporter/ReporterCardScreen'
 import OnboardingScreen from '../screens/OnboardingScreen'
+import LanguageSelectScreen from '../screens/LanguageSelectScreen'
+import LanguageSettingsScreen from '../screens/LanguageSettingsScreen'
+import { useLanguage } from '../context/LanguageContext'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { withReporterGate } from '../components/reporter/ReporterGate'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tab = createBottomTabNavigator<MainTabParamList>()
+
+export const navigationRef = createNavigationContainerRef<RootStackParamList>()
+
+export function navigateToNewsDetail(contentId: string) {
+  if (navigationRef.isReady()) {
+    (navigationRef as any).navigate('NewsDetailById', { id: contentId })
+  }
+}
 
 const GatedDashboard = withReporterGate(ReporterDashboardScreen)
 const GatedSubmitNews = withReporterGate(SubmitNewsScreen)
@@ -68,8 +80,17 @@ const tabIcons: Record<string, any> = {
   ProfileActive: 'person',
 }
 
+const tabLabels: Record<string, { hi: string; en: string }> = {
+  Home: { hi: 'होम', en: 'Home' },
+  Latest: { hi: 'लेटेस्ट', en: 'Latest' },
+  Search: { hi: 'खोजें', en: 'Search' },
+  Videos: { hi: 'वीडियो', en: 'Videos' },
+  Profile: { hi: 'प्रोफ़ाइल', en: 'Profile' },
+}
+
 function MainTabs() {
   const { colors } = useTheme()
+  const { language } = useLanguage()
   const insets = useSafeAreaInsets()
   const bottomInset = Math.max(insets.bottom, 18)
 
@@ -79,6 +100,7 @@ function MainTabs() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.secondary,
+        tabBarLabel: tabLabels[route.name]?.[language === 'hi' ? 'hi' : 'en'] || route.name,
         tabBarStyle: {
           backgroundColor: colors.bg,
           borderTopColor: colors.surfaceVariant,
@@ -94,7 +116,7 @@ function MainTabs() {
           paddingBottom: 4,
         },
         tabBarLabelStyle: {
-          fontFamily: fonts.inter[600],
+          fontFamily: language === 'hi' ? fonts.devanagari[700] : fonts.inter[600],
           fontSize: 10.5,
           lineHeight: 14,
           marginTop: 2,
@@ -108,7 +130,7 @@ function MainTabs() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Latest" component={FeedScreen} />
-      <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: 'Search' }} />
+      <Tab.Screen name="Search" component={SearchScreen} />
       <Tab.Screen name="Videos" component={VideosScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -175,6 +197,7 @@ function AppStackHeader({ navigation, route, options, back }: NativeStackHeaderP
 
 export default function RootNavigator() {
   const { user, loading } = useAuth()
+  const { isLanguageSelected, isLoading: languageLoading } = useLanguage()
   const { colors, fontScale, isDark } = useTheme()
   const [onboardingReady, setOnboardingReady] = useState(false)
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null)
@@ -207,7 +230,7 @@ export default function RootNavigator() {
       .finally(() => setOnboardingReady(true))
   }, [])
 
-  const isDataReady = !loading && onboardingReady && onboardingDone !== null
+  const isDataReady = !loading && !languageLoading && onboardingReady && onboardingDone !== null
 
   if (!splashFinished) {
     return (
@@ -221,28 +244,15 @@ export default function RootNavigator() {
 
   return (
     <ErrorBoundary>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
-          /*
-           * [TEMPORARILY BYPASSED AS REQUESTED]
-           * Onboarding screens (interest & location selection) are hidden.
-           * Defaults are set to:
-           * - Interest: ALL
-           * - Location: All India
-           * Direct entry lands on Home page ('Main').
-           * To re-enable onboarding in the future, uncomment:
-           * initialRouteName={onboardingDone ? 'Main' : 'Onboarding'}
-           */
-          initialRouteName="Main"
+          initialRouteName={isLanguageSelected ? 'Main' : 'LanguageSelect'}
           screenOptions={{
             header: (props) => <AppStackHeader {...props} />,
             headerShown: true,
           }}
         >
-          {/*
-           * <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
-           * Kept registered in stack for future re-enabling; initialRouteName defaults directly to 'Main'.
-           */}
+          <Stack.Screen name="LanguageSelect" component={LanguageSelectScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
           <Stack.Screen name="Saved" component={SavedScreen} options={{ title: 'Saved' }} />
@@ -251,12 +261,14 @@ export default function RootNavigator() {
           <Stack.Screen name="NewsDetail" component={NewsDetailScreen} options={{ headerShown: false }} />
           <Stack.Screen name="NewsDetailById" component={NewsDetailScreen} options={{ headerShown: false }} />
           <Stack.Screen name="CategoryNews" component={CategoryNewsScreen} options={{ title: '' }} />
+          <Stack.Screen name="CategoryNewsList" component={CategoryNewsListScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Search" component={SearchScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Bookmarks" component={BookmarksScreen} options={{ title: 'Bookmarks' }} />
           <Stack.Screen name="Favorites" component={FavoritesScreen} options={{ title: 'Favorites' }} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
           <Stack.Screen name="History" component={HistoryScreen} options={{ title: 'Reading History' }} />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+          <Stack.Screen name="LanguageSettings" component={LanguageSettingsScreen} options={{ title: 'Language Settings' }} />
           <Stack.Screen name="LocationPicker" component={LocationPickerScreen} options={{ title: 'Change Location' }} />
           <Stack.Screen name="AudioPlayer" component={AudioPlayerScreen} options={{ title: 'Audio News' }} />
           <Stack.Screen name="Categories" component={CategoriesScreen} options={{ headerShown: false }} />

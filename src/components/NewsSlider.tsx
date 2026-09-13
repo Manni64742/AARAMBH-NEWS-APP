@@ -7,6 +7,7 @@ import { colors, fonts, fontFor, radius, spacing } from '../theme'
 import { mediaUrl } from '../config'
 import { ScaledText as Text } from './ScaledText'
 import { useTheme } from '../context/ThemeContext'
+import { useLanguage } from '../context/LanguageContext'
 
 const timeAgo = (iso?: string) => {
   if (!iso) return ''
@@ -24,6 +25,7 @@ export const NewsSlider: React.FC<{
   autoPlayMs?: number
 }> = ({ items, onPress, title = 'Headlines', autoPlayMs = 3500 }) => {
   const { colors: tc } = useTheme()
+  const { language } = useLanguage()
   const { width } = useWindowDimensions()
   const listRef = useRef<FlatList<ContentItem>>(null)
   const [index, setIndex] = useState(0)
@@ -84,25 +86,27 @@ export const NewsSlider: React.FC<{
                   <View style={[styles.image, { backgroundColor: tc.surfaceContainer }]} />
                 )}
                 {item.flags?.isBreaking ? (
-                  <View style={styles.breakingBadge}>
-                    <View style={styles.breakingDot} />
-                    <Text style={styles.breakingText}>BREAKING</Text>
+                  <View style={[styles.breakingBadge, { backgroundColor: tc.primary }]}>
+                    <Ionicons name="flash" size={10} color="#fff" />
+                    <Text style={styles.breakingText}>{language === 'hi' ? 'ब्रेकिंग' : 'BREAKING'}</Text>
                   </View>
                 ) : null}
-                <View style={styles.categoryBadge}>
-                  <Text style={styles.categoryText}>
-                    {(item.category?.name?.en || 'News').toUpperCase()}
-                  </Text>
-                </View>
                 <View style={styles.timeBadge}>
                   <Ionicons name="time-outline" size={11} color="#fff" />
                   <Text style={styles.timeText}>{timeAgo(item.publishedAt)}</Text>
+                </View>
+                <View style={styles.categoryBadge}>
+                  <Text style={styles.categoryText}>
+                    {language === 'hi'
+                      ? (item.category?.name?.hi || item.category?.name?.en || 'समाचार')
+                      : (item.category?.name?.en || item.category?.name?.hi || 'News')}
+                  </Text>
                 </View>
               </View>
               <View style={styles.body}>
                 <Text
                   style={[styles.headline, { color: tc.text, fontFamily: fontFor(item.title, 700) }]}
-                  numberOfLines={3}
+                  numberOfLines={2}
                 >
                   {item.title}
                 </Text>
@@ -129,7 +133,14 @@ export const NewsSlider: React.FC<{
             }}
             hitSlop={6}
           >
-            <View style={[styles.dot, i === index ? { backgroundColor: tc.primary, width: 18 } : { backgroundColor: tc.surfaceVariant }]} />
+            <View
+              style={[
+                styles.dot,
+                i === index
+                  ? { backgroundColor: tc.primary, width: 16, height: 5, borderRadius: 3 }
+                  : { backgroundColor: tc.surfaceVariant, width: 5, height: 5, borderRadius: 2.5 },
+              ]}
+            />
           </Pressable>
         ))}
       </View>
@@ -146,9 +157,9 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
   },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
   counter: { fontFamily: fonts.inter[600], fontSize: 12 },
-  title: { fontFamily: fonts.serif[700], fontSize: 20, color: colors.text },
+  title: { fontFamily: fonts.sans[700], fontSize: 18, color: colors.text },
   sliderBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -162,63 +173,65 @@ const styles = StyleSheet.create({
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, paddingTop: 2 },
   card: {
     marginRight: spacing.md,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     overflow: 'hidden',
     borderWidth: 1,
   },
   imageWrap: { position: 'relative' },
-  image: { width: '100%', height: 190 },
+  image: { width: '100%', height: 185 },
   breakingBadge: {
     position: 'absolute',
     top: 10,
     left: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     backgroundColor: colors.primary,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
     borderRadius: radius.pill,
+    zIndex: 2,
   },
-  breakingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  breakingText: { fontFamily: fonts.inter[700], fontSize: 10, color: '#fff', letterSpacing: 0.6 },
-  categoryBadge: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: radius.sm,
-  },
-  categoryText: { fontFamily: fonts.inter[700], fontSize: 10, color: '#fff', letterSpacing: 0.7 },
+  breakingText: { fontFamily: fonts.devanagari[700], fontSize: 10, color: '#fff', letterSpacing: 0.4 },
   timeBadge: {
     position: 'absolute',
-    bottom: 10,
+    top: 10,
     right: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.65)',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3.5,
     borderRadius: radius.pill,
+    zIndex: 2,
   },
   timeText: { fontFamily: fonts.inter[500], fontSize: 10, color: '#fff' },
+  categoryBadge: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    backgroundColor: '#1E3A8A', // Highlight royal navy blue
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: radius.sm,
+    zIndex: 2,
+  },
+  categoryText: { fontFamily: fonts.sans[700], fontSize: 10, color: '#fff', letterSpacing: 0.4 },
   body: { padding: spacing.md },
   headline: {
-    fontFamily: fonts.serif[700],
-    fontSize: 18,
-    lineHeight: 24,
+    fontFamily: fonts.sans[700],
+    fontSize: 16,
+    lineHeight: 22,
     color: colors.text,
   },
-  summary: { fontSize: 13, lineHeight: 19, color: colors.textMuted, marginTop: 6 },
+  summary: { fontSize: 12.5, lineHeight: 18, color: colors.textMuted, marginTop: 4 },
   dotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
     paddingVertical: spacing.sm,
   },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
 })

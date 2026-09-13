@@ -59,7 +59,7 @@ export default function ShortsScreen({ navigation, onBackToVideos }: any) {
     const res = await contentApi.list({ page, limit: 10, status: 'PUBLISHED', contentType: 'SHORT_VIDEO' })
     // Strict filter: ONLY real short videos with a video URL
     const valid = (res.data || []).filter(
-      (i) => i.contentType === 'SHORT_VIDEO' && !!(i.shortVideoPayload?.videoUrl || i.videoPayload?.videoUrl)
+      (i: ContentItem) => i.contentType === 'SHORT_VIDEO' && !!(i.shortVideoPayload?.videoUrl || i.videoPayload?.videoUrl)
     )
     return { data: valid, pagination: res.pagination }
   }, [])

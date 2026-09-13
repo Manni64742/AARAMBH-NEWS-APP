@@ -1,5 +1,6 @@
-import React, { useCallback, useState } from 'react'
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
+import React, { useCallback, useEffect, useState } from 'react'
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
+import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { ScaledText as Text } from '../../components/ScaledText'
 import { reporterApi } from '../../api/endpoints'
@@ -9,6 +10,7 @@ import { EmptyState, ErrorState, SkeletonCard } from '../../components/States'
 import { usePagedFeed } from '../../hooks/usePagedFeed'
 import { CategoryChip } from '../../components/NewsCard'
 import { useTheme } from '../../context/ThemeContext'
+import { mediaUrl } from '../../config'
 
 const STATUSES = [
   { key: '', label: 'All' },
@@ -26,9 +28,15 @@ const statusColor: Record<string, string> = {
   REJECTED: colors.danger,
 }
 
-export default function MySubmissionsScreen({ navigation }: any) {
+export default function MySubmissionsScreen({ navigation, route }: any) {
   const { colors } = useTheme()
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState(route?.params?.initialStatus || '')
+
+  useEffect(() => {
+    if (route?.params?.initialStatus !== undefined) {
+      setStatus(route?.params?.initialStatus)
+    }
+  }, [route?.params?.initialStatus])
 
   const load = useCallback(
     async (page: number) => {
@@ -42,36 +50,112 @@ export default function MySubmissionsScreen({ navigation }: any) {
 
   return (
     <View style={[styles.safe, { backgroundColor: colors.background }]}>
-      <FlatList
-        horizontal
-        style={styles.statusList}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10 }}
-        data={STATUSES}
-        keyExtractor={(s) => s.key}
-        renderItem={({ item }) => (
-          <CategoryChip label={item.label} active={status === item.key} onPress={() => setStatus(item.key)} />
-        )}
-      />
+      {/* Fixed Clean Top Status Tabs */}
+      <View style={[styles.filterBarContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterBarContent}
+        >
+          {STATUSES.map((item) => {
+            const isActive = status === item.key
+            return (
+              <Pressable
+                key={item.key}
+                style={[
+                  styles.filterTab,
+                  {
+                    backgroundColor: isActive ? colors.primary : colors.surfaceContainer,
+                    borderColor: isActive ? colors.primary : colors.border,
+                  },
+                ]}
+                onPress={() => setStatus(item.key)}
+              >
+                <Text
+                  style={[
+                    styles.filterTabText,
+                    { color: isActive ? '#fff' : colors.textMuted, fontWeight: isActive ? '700' : '600' },
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+      </View>
+
       <FlatList
         data={feed.items}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => (
-          <View style={[styles.itemRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Pressable style={styles.itemBody} onPress={() => navigation.push('NewsDetail', { item })}>
-              <Text style={[styles.itemTitle, { color: colors.text, fontFamily: fontFor(item.title, 700) }]} numberOfLines={2}>{item.title}</Text>
-              <Text style={[styles.itemMeta, { color: colors.textMuted }]}>
-                {item.contentType} · {item.category?.name?.en || '—'} · {new Date(item.createdAt).toLocaleDateString()}
-              </Text>
-            </Pressable>
-            {item.status === 'DRAFT' || item.status === 'PENDING_REVIEW' || item.status === 'REJECTED' ? (
-              <Pressable style={[styles.editBtn, { borderColor: colors.primary }]} onPress={() => navigation.navigate('SubmitNews', { item })} hitSlop={6}>
-                <Ionicons name="create-outline" size={16} color={colors.primary} />
-              </Pressable>
-            ) : null}
-            <View style={[styles.badge, { backgroundColor: `${statusColor[item.status]}20` }]}>
-              <Text style={[styles.badgeText, { color: statusColor[item.status] }]}>{item.status.replace(/_/g, ' ')}</Text>
+          <Pressable
+            style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => navigation.push('NewsDetail', { item })}
+          >
+            {/* Top Row: Category Tag & Status Badge */}
+            <View style={styles.cardTopRow}>
+              <View style={[styles.catBadge, { backgroundColor: colors.surfaceContainer }]}>
+                <Text style={[styles.catBadgeText, { color: colors.textMuted }]}>
+                  {item.category?.name?.en || item.contentType}
+                </Text>
+              </View>
+              <View style={[styles.badge, { backgroundColor: `${statusColor[item.status] || colors.textMuted}18`, borderColor: `${statusColor[item.status] || colors.textMuted}50` }]}>
+                <View style={[styles.statusDot, { backgroundColor: statusColor[item.status] || colors.textMuted }]} />
+                <Text style={[styles.badgeText, { color: statusColor[item.status] || colors.textMuted }]}>
+                  {item.status.replace(/_/g, ' ')}
+                </Text>
+              </View>
             </View>
-          </View>
+
+            {/* Middle Row: Headline + Thumbnail Image */}
+            <View style={styles.cardMiddleRow}>
+              <Text
+                style={[
+                  styles.itemTitle,
+                  {
+                    color: colors.text,
+                    fontFamily: fontFor(item.title, 700),
+                    flex: 1,
+                    marginRight: item.featuredImage?.url ? 12 : 0,
+                  },
+                ]}
+                numberOfLines={2}
+              >
+                {item.title}
+              </Text>
+              {item.featuredImage?.url ? (
+                <Image
+                  source={{ uri: mediaUrl(item.featuredImage.url) }}
+                  style={styles.cardThumbnail}
+                  contentFit="cover"
+                  transition={200}
+                />
+              ) : null}
+            </View>
+
+            {/* Bottom Row: Metadata & Edit Button */}
+            <View style={styles.cardBottomRow}>
+              <Text style={[styles.itemMeta, { color: colors.textMuted }]}>
+                {new Date(item.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                {item.metrics?.views ? ` · 👁 ${item.metrics.views}` : ''}
+              </Text>
+
+              {item.status === 'DRAFT' || item.status === 'PENDING_REVIEW' || item.status === 'REJECTED' ? (
+                <Pressable
+                  style={[styles.editBtn, { backgroundColor: colors.primarySoft, borderColor: colors.primary }]}
+                  onPress={(e) => {
+                    e.stopPropagation()
+                    navigation.navigate('SubmitNews', { item })
+                  }}
+                  hitSlop={8}
+                >
+                  <Ionicons name="create-outline" size={14} color={colors.primary} />
+                  <Text style={[styles.editBtnText, { color: colors.primary }]}>Edit</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </Pressable>
         )}
         ListEmptyComponent={
           feed.loading ? (
@@ -94,12 +178,110 @@ export default function MySubmissionsScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  statusList: { flexGrow: 0 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, marginHorizontal: 16, marginBottom: 8, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 12, gap: 10 },
-  itemBody: { flex: 1, paddingRight: 6 },
-  editBtn: { borderWidth: 1, borderRadius: 8, padding: 8 },
-  itemTitle: { fontSize: 14, fontWeight: '700', color: colors.text, lineHeight: 19 },
-  itemMeta: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
-  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  badgeText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
+  filterBarContainer: {
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: 8,
+  },
+  filterBarContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    alignItems: 'center',
+  },
+  filterTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterTabText: {
+    fontSize: 13,
+  },
+  itemCard: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  catBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  catBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  cardMiddleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    gap: 10,
+  },
+  cardThumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  itemTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 21,
+  },
+  cardBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(150, 150, 150, 0.15)',
+    paddingTop: 8,
+  },
+  itemMeta: {
+    fontSize: 11.5,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  editBtnText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
 })

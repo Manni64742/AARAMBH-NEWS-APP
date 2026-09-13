@@ -1,10 +1,10 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { FlatList, Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
-import { contentApi, liveStreamApi } from '../api/endpoints'
-import { ContentItem, LiveStreamItem, Pagination } from '../types'
+import { categoryApi, contentApi, liveStreamApi } from '../api/endpoints'
+import { CategoryItem, ContentItem, LiveStreamItem, Pagination } from '../types'
 import { colors, fonts, radius, spacing } from '../theme'
 import { CategoryChip } from '../components/NewsCard'
 import { EmptyState, ErrorState, SkeletonCard } from '../components/States'
@@ -13,6 +13,7 @@ import { ScaledText as Text } from '../components/ScaledText'
 import { mediaUrl } from '../config'
 import ShortsScreen from './ShortsScreen'
 import { useTheme } from '../context/ThemeContext'
+import { useLanguage } from '../context/LanguageContext'
 
 const VIDEO_FILTERS = [
   { key: '', label: 'All Videos' },
@@ -30,6 +31,8 @@ interface MediaCardItem {
   title: string
   thumbnail?: string
   duration?: number
+  category?: string
+  views?: number
   meta: string
   isLive: boolean
   onPress: () => void
@@ -41,7 +44,7 @@ function formatDuration(sec?: number) {
 }
 
 function MediaCard({ item }: { item: MediaCardItem }) {
-  const { colors: tc } = useTheme()
+  const { colors: tc, isDark } = useTheme()
   const thumb = mediaUrl(item.thumbnail)
   const duration = formatDuration(item.duration)
   return (
@@ -75,12 +78,43 @@ function MediaCard({ item }: { item: MediaCardItem }) {
         {duration ? <Text style={styles.duration}>{duration}</Text> : null}
       </View>
       <View style={styles.info}>
+        {item.category ? (
+          <View
+            style={[
+              styles.categoryBadgeWrap,
+              {
+                backgroundColor: isDark ? 'rgba(30, 58, 138, 0.35)' : '#EFF6FF',
+                borderColor: isDark ? '#1E3A8A' : '#DBEAFE',
+              },
+            ]}
+          >
+            <Text style={[styles.categoryLabel, { color: isDark ? '#93C5FD' : '#1D4ED8' }]}>
+              {item.category.toUpperCase()}
+            </Text>
+          </View>
+        ) : null}
         <Text style={[styles.itemTitle, { color: tc.text }]} numberOfLines={2}>
           {item.title}
         </Text>
-        <Text style={[styles.meta, { color: tc.textMuted }]} numberOfLines={1}>
-          {item.meta}
-        </Text>
+        <View style={styles.metaRow}>
+          {item.views !== undefined ? (
+            <View style={styles.viewsWrap}>
+              <Ionicons
+                name="eye-outline"
+                size={13}
+                color={isDark ? '#60A5FA' : '#2563EB'}
+                style={styles.viewEyeIcon}
+              />
+              <Text style={[styles.viewsText, { color: tc.textMuted }]}>
+                {item.views.toLocaleString()} {item.views === 1 ? 'view' : 'views'}
+              </Text>
+            </View>
+          ) : (
+            <Text style={[styles.metaText, { color: tc.textMuted }]} numberOfLines={1}>
+              {item.meta}
+            </Text>
+          )}
+        </View>
       </View>
     </Pressable>
   )
@@ -88,12 +122,39 @@ function MediaCard({ item }: { item: MediaCardItem }) {
 
 export default function VideosScreen({ navigation }: any) {
   const { colors: themeColors, isDark } = useTheme()
+  const { language } = useLanguage()
   const insets = useSafeAreaInsets()
   const topInset = insets.top
   const [headerWrapHeight, setHeaderWrapHeight] = useState(0)
   const [mode, setMode] = useState<'videos' | 'shorts'>('videos')
   const [activeType, setActiveType] = useState('')
+  const [categories, setCategories] = useState<CategoryItem[]>([])
   const isShorts = mode === 'shorts'
+
+  useEffect(() => {
+    categoryApi.list().then(setCategories).catch(() => {})
+  }, [])
+
+  const videoFilters = useMemo(() => {
+    const base = [
+      { key: '', label: language === 'hi' ? 'सभी वीडियो' : 'All Videos' },
+      { key: 'LIVE', label: language === 'hi' ? 'लाइव स्ट्रीम' : 'Live Streams' },
+    ]
+    const catFilters = (categories || [])
+      .filter((c) => c.level === 'TOP_LEVEL' || !c.parentId)
+      .slice(0, 8)
+      .map((c) => ({
+        key: c._id,
+        label: (language === 'hi' ? (c.name?.hi || c.name?.en) : (c.name?.en || c.name?.hi)) || c.slug,
+      }))
+    return catFilters.length > 0 ? [...base, ...catFilters] : [
+      { key: '', label: language === 'hi' ? 'सभी वीडियो' : 'All Videos' },
+      { key: 'LIVE', label: language === 'hi' ? 'लाइव स्ट्रीम' : 'Live Streams' },
+      { key: 'market', label: language === 'hi' ? 'मार्केट' : 'Market' },
+      { key: 'india', label: language === 'hi' ? 'देश' : 'India' },
+      { key: 'sports', label: language === 'hi' ? 'खेल' : 'Sports' },
+    ]
+  }, [categories, language])
 
   const toContentCard = useCallback(
     (item: ContentItem): MediaCardItem => {
@@ -101,18 +162,21 @@ export default function VideosScreen({ navigation }: any) {
         item.featuredImage?.url ||
         item.videoPayload?.thumbnail ||
         (item.youtubeId ? `https://img.youtube.com/vi/${item.youtubeId}/hqdefault.jpg` : undefined)
+      const catName = (language === 'hi' ? item.category?.name?.hi : item.category?.name?.en) || item.category?.name?.en || item.category?.name?.hi || ''
       return {
         key: item._id,
         type: 'video',
         title: item.title,
         thumbnail: thumb,
         duration: item.videoPayload?.duration,
-        meta: `${item.category?.name?.en || 'News'} · 👁 ${(item.metrics?.views || 0).toLocaleString()}`,
+        category: catName,
+        views: item.metrics?.views,
+        meta: `${catName || 'News'} · ${(item.metrics?.views || 0).toLocaleString()} ${(item.metrics?.views || 0) === 1 ? 'view' : 'views'}`,
         isLive: false,
         onPress: () => navigation.navigate('NewsDetail', { item }),
       }
     },
-    [navigation]
+    [language, navigation]
   )
 
   const toLiveCard = useCallback(
@@ -154,12 +218,13 @@ export default function VideosScreen({ navigation }: any) {
         limit: 12,
         status: 'PUBLISHED',
         contentType: 'VIDEO',
-        category: activeType.startsWith('cat-') ? activeType : undefined,
+        category: activeType && activeType !== 'LIVE' ? activeType : undefined,
+        language,
       })
 
       // Strict filter: ONLY items that actually have video / YouTube links
       const validVideos = (res.data || []).filter(
-        (i) =>
+        (i: ContentItem) =>
           i.contentType === 'VIDEO' ||
           !!(i.youtubeId || i.youtubeUrl || i.videoPayload?.videoUrl || i.bodyBlocks?.some((b: any) => b.type === 'YOUTUBE' || b.type === 'VIDEO'))
       )
@@ -168,7 +233,7 @@ export default function VideosScreen({ navigation }: any) {
       const head = page === 1 && !activeType ? live.map(toLiveCard) : []
       return { data: [...head, ...cards], pagination: res.pagination }
     },
-    [activeType, toContentCard, toLiveCard]
+    [activeType, toContentCard, toLiveCard, language]
   )
 
   const feed = usePagedFeed<MediaCardItem>({ load })
@@ -263,7 +328,7 @@ export default function VideosScreen({ navigation }: any) {
             showsHorizontalScrollIndicator={false}
             style={styles.typeList}
             contentContainerStyle={styles.typeContent}
-            data={VIDEO_FILTERS}
+            data={videoFilters}
             keyExtractor={(t) => t.key}
             renderItem={({ item }) => (
               <CategoryChip
@@ -380,6 +445,32 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   info: { padding: spacing.sm },
+  categoryBadgeWrap: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+    marginBottom: 5,
+  },
+  categoryLabel: {
+    fontFamily: fonts.inter[700],
+    fontSize: 9,
+    letterSpacing: 0.5,
+  },
   itemTitle: { fontFamily: fonts.serif[700], fontSize: 14, lineHeight: 19 },
   meta: { fontFamily: fonts.inter[500], fontSize: 11, marginTop: 4 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  viewsWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  viewEyeIcon: {
+    transform: [{ translateY: Platform.OS === 'android' ? 0.5 : 0 }],
+  },
+  viewsText: {
+    fontFamily: fonts.inter[500],
+    fontSize: 11,
+    lineHeight: 15,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  metaText: { fontFamily: fonts.inter[500], fontSize: 11 },
 })

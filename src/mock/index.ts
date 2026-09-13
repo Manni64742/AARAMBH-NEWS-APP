@@ -6,7 +6,7 @@ import { MOCK_CATEGORIES, MOCK_COMMENTS, MOCK_LIVE_STREAMS, MOCK_NEWS, MOCK_REPO
  * Set to `false` (and delete the guards in src/api/endpoints.ts) to restore the
  * real REST API responses.
  */
-export const USE_MOCK_DATA = true
+export const USE_MOCK_DATA = false
 
 const ok = <T>(data: T, pagination?: Pagination): ApiResponse<T> =>
   pagination
@@ -94,6 +94,21 @@ export function filterMockNews(params: Record<string, any>): ContentItem[] {
   if (params.sort === 'trending') list.sort((a, b) => (b.trendingScore || 0) - (a.trendingScore || 0))
   else if (params.sort === 'views') list.sort((a, b) => (b.metrics?.views || 0) - (a.metrics?.views || 0))
   else list.sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime())
+
+  if (params.language) {
+    const lang = String(params.language).toLowerCase()
+    const langFiltered = list.filter((i) => {
+      const itemLang = (i.language || 'hi').toLowerCase()
+      if (lang === 'hi') {
+        return itemLang === 'hi' || itemLang === 'hi-en' || itemLang === 'hinglish'
+      }
+      if (lang === 'en') {
+        return itemLang === 'en' || itemLang === 'hi-en'
+      }
+      return itemLang === lang
+    })
+    if (langFiltered.length > 0) list = langFiltered
+  }
 
   if (params.excludeNewsId) list = list.filter((i) => i._id !== params.excludeNewsId)
   return list
