@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Animated, FlatList, Platform, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
-import { liveStreamApi } from '../api/endpoints'
-import { LiveStreamItem } from '../types'
+import { contentApi, liveStreamApi } from '../api/endpoints'
+import { ContentItem, LiveStreamItem } from '../types'
 import { colors, fonts, fontFor, radius, spacing } from '../theme'
 import { useTheme } from '../context/ThemeContext'
 import { ScaledText as Text } from '../components/ScaledText'
@@ -49,6 +49,7 @@ const STATUS_LABEL: Record<string, { text: string; color: string }> = {
 export default function LiveNewsScreen({ navigation }: any) {
   const { colors: themeColors } = useTheme()
   const [items, setItems] = useState<LiveStreamItem[]>([])
+  const [liveArticles, setLiveArticles] = useState<ContentItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [playingId, setPlayingId] = useState<string | null>(null)
@@ -57,10 +58,14 @@ export default function LiveNewsScreen({ navigation }: any) {
     setLoading(true)
     setError(null)
     try {
-      const list = await liveStreamApi.list()
-      setItems(list.sort((a: LiveStreamItem, b: LiveStreamItem) => (a.status === 'LIVE' ? -1 : 1)))
+      const [streamsRes, articlesRes] = await Promise.all([
+        liveStreamApi.list().catch(() => []),
+        contentApi.live().catch(() => ({ data: [] as ContentItem[] })),
+      ])
+      setItems((streamsRes || []).sort((a: LiveStreamItem, b: LiveStreamItem) => (a.status === 'LIVE' ? -1 : 1)))
+      setLiveArticles(articlesRes?.data || [])
     } catch {
-      setError('Failed to load live streams')
+      setError('Failed to load live content')
     } finally {
       setLoading(false)
     }
@@ -96,7 +101,7 @@ export default function LiveNewsScreen({ navigation }: any) {
           <Text style={{ flex: 1, fontFamily: fonts.sans[700], fontSize: 16.5, color: themeColors.text }}>
             Live News
           </Text>
-          <LiveDot active={items.some((i) => i.status === 'LIVE')} />
+          <LiveDot active={items.some((i) => i.status === 'LIVE') || liveArticles.length > 0} />
         </View>
       </View>
 
@@ -104,6 +109,77 @@ export default function LiveNewsScreen({ navigation }: any) {
         data={items}
         keyExtractor={(item) => item._id}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: 60 }}
+        ListHeaderComponent={
+          liveArticles.length > 0 ? (
+            <View style={{ marginBottom: spacing.lg }}>
+              <View style={styles.sectionHeaderRow}>
+                <View style={[styles.liveIndicatorPill, { backgroundColor: '#DC2626' }]}>
+                  <View style={styles.whitePulseDot} />
+                  <Text style={styles.liveIndicatorPillText}>LIVE COVERAGE</Text>
+                </View>
+                <Text style={[styles.sectionCountText, { color: themeColors.textMuted }]}>
+                  {liveArticles.length} {liveArticles.length === 1 ? 'Update' : 'Updates'}
+                </Text>
+              </View>
+
+              {liveArticles.map((art) => {
+                const artImage = mediaUrl(art.featuredImage?.url)
+                return (
+                  <Pressable
+                    key={art._id}
+                    style={[
+                      styles.liveArticleCard,
+                      {
+                        backgroundColor: themeColors.card,
+                        borderColor: themeColors.border,
+                      },
+                    ]}
+                    onPress={() => navigation.navigate('NewsDetail', { item: art })}
+                  >
+                    {artImage ? (
+                      <Image source={{ uri: artImage }} style={styles.liveArticleImage} contentFit="cover" transition={200} />
+                    ) : null}
+                    <View style={styles.liveArticleBody}>
+                      <View style={styles.liveArticleMetaRow}>
+                        <View style={[styles.liveTagBadge, { backgroundColor: '#FEE2E2' }]}>
+                          <View style={[styles.liveDot, { backgroundColor: '#DC2626' }]} />
+                          <Text style={[styles.liveTagText, { color: '#DC2626' }]}>LIVE</Text>
+                        </View>
+                        {art.category?.name ? (
+                          <Text style={[styles.liveArticleCat, { color: themeColors.primary }]}>
+                            {art.category.name.hi || art.category.name.en}
+                          </Text>
+                        ) : null}
+                        <Text style={[styles.liveArticleTime, { color: themeColors.textMuted }]}>
+                          {art.publishedAt
+                            ? new Date(art.publishedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            : ''}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[styles.liveArticleTitle, { color: themeColors.text, fontFamily: fontFor(art.title, 700) }]}
+                        numberOfLines={2}
+                      >
+                        {art.title}
+                      </Text>
+                      {art.summary ? (
+                        <Text style={[styles.liveArticleSummary, { color: themeColors.textMuted }]} numberOfLines={2}>
+                          {art.summary}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </Pressable>
+                )
+              })}
+
+              {items.length > 0 ? (
+                <View style={[styles.sectionHeaderRow, { marginTop: spacing.md, marginBottom: spacing.sm }]}>
+                  <Text style={[styles.streamsSectionTitle, { color: themeColors.text }]}>Live Video Streams</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null
+        }
         renderItem={({ item }) => {
           const isLive = item.status === 'LIVE'
           const thumb = youtubeThumb(item.youtubeId) || mediaUrl(item.thumbnailUrl)
@@ -176,12 +252,12 @@ export default function LiveNewsScreen({ navigation }: any) {
             </View>
           ) : error ? (
             <ErrorState message={error} onRetry={load} />
-          ) : (
+          ) : liveArticles.length === 0 ? (
             <EmptyState
-              title="No live streams right now"
-              subtitle="Check back soon — our desk will go live on YouTube here."
+              title="No live content right now"
+              subtitle="Check back soon — our desk will publish live coverage and stream updates here."
             />
-          )
+          ) : null
         }
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} colors={[colors.primary]} />}
         showsVerticalScrollIndicator={false}
@@ -207,6 +283,90 @@ const styles = StyleSheet.create({
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
   liveDotOff: { backgroundColor: '#9aa0a6' },
+  whitePulseDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ffffff' },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  liveIndicatorPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  liveIndicatorPillText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontFamily: fonts.inter[700],
+    letterSpacing: 0.5,
+  },
+  sectionCountText: {
+    fontSize: 12,
+    fontFamily: fonts.inter[500],
+  },
+  streamsSectionTitle: {
+    fontSize: 15,
+    fontFamily: fonts.sans[700],
+  },
+  liveArticleCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: spacing.md,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+  },
+  liveArticleImage: {
+    width: '100%',
+    height: 180,
+  },
+  liveArticleBody: {
+    padding: spacing.md,
+  },
+  liveArticleMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  liveTagBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  liveTagText: {
+    fontSize: 10,
+    fontFamily: fonts.inter[700],
+    letterSpacing: 0.4,
+  },
+  liveArticleCat: {
+    fontSize: 12,
+    fontFamily: fonts.inter[600],
+  },
+  liveArticleTime: {
+    fontSize: 11,
+    fontFamily: fonts.inter[400],
+    marginLeft: 'auto',
+  },
+  liveArticleTitle: {
+    fontSize: 16,
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  liveArticleSummary: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
   card: {
     borderRadius: radius.lg,
     borderWidth: 1,

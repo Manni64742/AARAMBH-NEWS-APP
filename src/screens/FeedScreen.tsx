@@ -31,6 +31,9 @@ export default function FeedScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false)
   const [groupedSections, setGroupedSections] = useState<GroupedSection[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
 
   const categoryScrollRef = useRef<ScrollView>(null)
   const touchStartX = useRef(0)
@@ -209,10 +212,12 @@ export default function FeedScreen({ navigation }: any) {
   const loadGroupedFeed = useCallback(() => {
     let isMounted = true
     setLoading(true)
-    contentApi.groupedLatest({ category: activeCategory, language }).then((res) => {
+    setPage(1)
+    contentApi.groupedLatest({ category: activeCategory, language, page: 1 }).then((res) => {
       if (!isMounted) return
       if (res && Array.isArray(res.groups)) {
         setGroupedSections(res.groups)
+        setHasMore(res.pagination?.hasNextPage ?? (res.groups.length > 0))
       }
     }).catch(() => {
     }).finally(() => {
@@ -225,6 +230,30 @@ export default function FeedScreen({ navigation }: any) {
     const cleanup = loadGroupedFeed()
     return cleanup
   }, [loadGroupedFeed])
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || loading || refreshing || !hasMore) return
+    setLoadingMore(true)
+    const nextPage = page + 1
+    try {
+      const res = await contentApi.groupedLatest({ category: activeCategory, language, page: nextPage })
+      if (res && Array.isArray(res.groups) && res.groups.length > 0) {
+        setGroupedSections((prev) => {
+          const existingIds = new Set(prev.map((g) => g.id))
+          const newGroups = res.groups.filter((g: any) => !existingIds.has(g.id))
+          return [...prev, ...newGroups]
+        })
+        setPage(nextPage)
+        setHasMore(res.pagination?.hasNextPage ?? false)
+      } else {
+        setHasMore(false)
+      }
+    } catch {
+      setHasMore(false)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [activeCategory, language, page, hasMore, loadingMore, loading, refreshing])
 
   const onRefresh = () => {
     setRefreshing(true)
@@ -276,7 +305,17 @@ export default function FeedScreen({ navigation }: any) {
             subtitle={language === 'hi' ? 'कृपया दूसरी श्रेणी चुनें' : 'Try selecting another category'}
           />
         }
-        ListFooterComponent={groupedSections.length > 0 ? <AdBanner slot="feed_bottom" /> : null}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={{ paddingVertical: 16 }}>
+              <AarambhLoader size="sm" />
+            </View>
+          ) : groupedSections.length > 0 ? (
+            <AdBanner slot="feed_bottom" />
+          ) : null
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: headerPaddingTop, paddingBottom: 70 }}
         scrollIndicatorInsets={{ top: headerPaddingTop }}

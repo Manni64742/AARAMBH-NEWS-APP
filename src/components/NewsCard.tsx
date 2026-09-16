@@ -67,7 +67,12 @@ export const NewsCard: React.FC<{
               {categoryLabel}
             </Text>
           </View>
-          {isBreaking ? (
+          {item.flags?.isLiveCoverage ? (
+            <View style={[styles.breakingBadge, { backgroundColor: '#E11D48' }]}>
+              <View style={styles.breakingDotSmall} />
+              <Text style={styles.breakingBadgeText}>🔴 LIVE</Text>
+            </View>
+          ) : isBreaking ? (
             <View style={[styles.breakingBadge, { backgroundColor: tc.primary }]}>
               <View style={styles.breakingDotSmall} />
               <Text style={styles.breakingBadgeText}>BREAKING</Text>

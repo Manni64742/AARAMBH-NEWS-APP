@@ -29,7 +29,7 @@
         "android.permission.WAKE_LOCK"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff",
+        "backgroundColor": "#121517",
         "foregroundImage": "./assets/aarambh_news_adaptive_foreground.png"
       },
       "predictiveBackGestureEnabled": false

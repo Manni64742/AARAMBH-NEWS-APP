@@ -15,7 +15,16 @@ import * as ImagePicker from 'expo-image-picker'
 import * as DocumentPicker from 'expo-document-picker'
 import { Ionicons } from '@expo/vector-icons'
 import { categoryApi, contentApi, locationApi, mediaApi } from '../../api/endpoints'
-import { ArticleBlock, CategoryItem, ContentItem, ContentType, LocationItem } from '../../types'
+import {
+  ArticleBlock,
+  CategoryItem,
+  ContentItem,
+  ContentType,
+  LocationItem,
+  PriorityLevel,
+  EditorialTone,
+  SponsorType,
+} from '../../types'
 import { useToast } from '../../context/ToastContext'
 import { useLocation } from '../../context/LocationContext'
 import { useAuth } from '../../context/AuthContext'
@@ -24,6 +33,7 @@ import { mediaUrl } from '../../config'
 import { colors as defaultColors, fonts } from '../../theme'
 import { useTheme } from '../../context/ThemeContext'
 import ArticleBlockEditor from '../../components/reporter/ArticleBlockEditor'
+import { ArticleWatermark } from '../../components/ArticleWatermark'
 
 const TYPES: Array<{ key: ContentType; label: string }> = [
   { key: 'ARTICLE', label: 'Article' },
@@ -102,6 +112,19 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
   const [scope, setScope] = useState<'NATIONAL' | 'INTERNATIONAL' | 'STATE' | 'DISTRICT'>(
     (item?.location?.scope as any) || 'NATIONAL'
   )
+
+  // Editorial Flags & Options
+  const initialFlags = item?.flags || {}
+  const [isBreaking, setIsBreaking] = useState(Boolean(initialFlags.isBreaking))
+  const [isFeatured, setIsFeatured] = useState(Boolean(initialFlags.isFeatured))
+  const [isExclusive, setIsExclusive] = useState(Boolean(initialFlags.isExclusive))
+  const [isLiveCoverage, setIsLiveCoverage] = useState(Boolean(initialFlags.isLiveCoverage))
+  const [priority, setPriority] = useState<PriorityLevel>(initialFlags.priority || 'NORMAL')
+  const [editorialTone, setEditorialTone] = useState<EditorialTone>(initialFlags.editorialTone || 'NEWS')
+  const [isSponsored, setIsSponsored] = useState(Boolean(initialFlags.isSponsored))
+  const [sponsorName, setSponsorName] = useState(initialFlags.sponsorName || '')
+  const [sendPushNotification, setSendPushNotification] = useState(Boolean(initialFlags.sendPushNotification))
+  const [showEditorialOptions, setShowEditorialOptions] = useState(false)
 
   const [busy, setBusy] = useState(false)
   const draftKey = `aarambh_article_draft_${user?._id || 'anon'}`
@@ -271,6 +294,20 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
         language,
         visibility: 'PUBLIC',
         location,
+        flags: {
+          isBreaking,
+          isFeatured,
+          isExclusive,
+          isLiveCoverage,
+          priority,
+          editorialTone,
+          isSponsored,
+          sponsorType: isSponsored ? 'SPONSORED' : 'NONE',
+          sponsorName: isSponsored ? sponsorName.trim() || undefined : undefined,
+          isPressRelease: editorialTone === 'PRESS_RELEASE',
+          sendPushNotification,
+          showOnHome: true,
+        },
       }
       if (mediaUrlState?.kind === 'VIDEO') payload.videoPayload = { videoUrl: mediaUrlState.url }
       if (mediaUrlState?.kind === 'SHORT_VIDEO') payload.shortVideoPayload = { videoUrl: mediaUrlState.url }
@@ -646,6 +683,235 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
         </Pressable>
       </View>
 
+      {/* Editorial & Publishing Controls Section */}
+      <View style={{ marginTop: 16 }}>
+        <Pressable
+          style={[
+            styles.editorialHeaderBtn,
+            { backgroundColor: colors.surfaceContainer, borderColor: colors.border },
+          ]}
+          onPress={() => setShowEditorialOptions(!showEditorialOptions)}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="options-outline" size={18} color={colors.primary} />
+            <Text style={[styles.editorialHeaderTitle, { color: colors.text }]}>
+              Editorial & Publishing Options
+            </Text>
+          </View>
+          <Ionicons
+            name={showEditorialOptions ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={colors.textMuted}
+          />
+        </Pressable>
+
+        {showEditorialOptions && (
+          <View
+            style={[
+              styles.editorialBox,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
+          >
+            {/* 1. Flags */}
+            <Text style={[styles.subSectionTitle, { color: colors.text }]}>Placement & Badges</Text>
+            <View style={styles.editorialChipsRow}>
+              <Pressable
+                style={[
+                  styles.editorialChip,
+                  { borderColor: colors.border, backgroundColor: colors.surfaceContainer },
+                  isBreaking && { backgroundColor: '#DC2626', borderColor: '#DC2626' },
+                ]}
+                onPress={() => {
+                  const val = !isBreaking
+                  setIsBreaking(val)
+                  if (val) setSendPushNotification(true)
+                }}
+              >
+                <Text
+                  style={[
+                    styles.editorialChipText,
+                    { color: colors.text },
+                    isBreaking && { color: '#fff', fontWeight: '700' },
+                  ]}
+                >
+                  ⚡ Breaking
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.editorialChip,
+                  { borderColor: colors.border, backgroundColor: colors.surfaceContainer },
+                  isFeatured && { backgroundColor: '#D97706', borderColor: '#D97706' },
+                ]}
+                onPress={() => setIsFeatured(!isFeatured)}
+              >
+                <Text
+                  style={[
+                    styles.editorialChipText,
+                    { color: colors.text },
+                    isFeatured && { color: '#fff', fontWeight: '700' },
+                  ]}
+                >
+                  ★ Featured
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.editorialChip,
+                  { borderColor: colors.border, backgroundColor: colors.surfaceContainer },
+                  isExclusive && { backgroundColor: '#7C3AED', borderColor: '#7C3AED' },
+                ]}
+                onPress={() => setIsExclusive(!isExclusive)}
+              >
+                <Text
+                  style={[
+                    styles.editorialChipText,
+                    { color: colors.text },
+                    isExclusive && { color: '#fff', fontWeight: '700' },
+                  ]}
+                >
+                  💎 Exclusive
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.editorialChip,
+                  { borderColor: colors.border, backgroundColor: colors.surfaceContainer },
+                  isLiveCoverage && { backgroundColor: '#E11D48', borderColor: '#E11D48' },
+                ]}
+                onPress={() => setIsLiveCoverage(!isLiveCoverage)}
+              >
+                <Text
+                  style={[
+                    styles.editorialChipText,
+                    { color: colors.text },
+                    isLiveCoverage && { color: '#fff', fontWeight: '700' },
+                  ]}
+                >
+                  🔴 Live
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* 2. Priority */}
+            <Text style={[styles.subSectionTitle, { color: colors.text, marginTop: 12 }]}>Story Priority</Text>
+            <View style={styles.editorialChipsRow}>
+              {[
+                { key: 'NORMAL', label: 'Normal' },
+                { key: 'HIGH', label: 'High' },
+                { key: 'CRITICAL', label: 'Critical' },
+              ].map((p) => (
+                <Pressable
+                  key={p.key}
+                  style={[
+                    styles.editorialChip,
+                    { borderColor: colors.border, backgroundColor: colors.surfaceContainer },
+                    priority === p.key && {
+                      backgroundColor: p.key === 'CRITICAL' ? '#9F1239' : p.key === 'HIGH' ? '#EA580C' : colors.primary,
+                      borderColor: p.key === 'CRITICAL' ? '#9F1239' : p.key === 'HIGH' ? '#EA580C' : colors.primary,
+                    },
+                  ]}
+                  onPress={() => {
+                    setPriority(p.key as PriorityLevel)
+                    if (p.key === 'CRITICAL') setSendPushNotification(true)
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.editorialChipText,
+                      { color: colors.text },
+                      priority === p.key && { color: '#fff', fontWeight: '700' },
+                    ]}
+                  >
+                    {p.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* 3. Tone */}
+            <Text style={[styles.subSectionTitle, { color: colors.text, marginTop: 12 }]}>Content Tone</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              {[
+                { key: 'NEWS', label: 'News' },
+                { key: 'OPINION', label: 'Opinion' },
+                { key: 'ANALYSIS', label: 'Analysis' },
+                { key: 'INTERVIEW', label: 'Interview' },
+                { key: 'EXPLAINER', label: 'Explainer' },
+                { key: 'REPORT', label: 'Report' },
+                { key: 'PRESS_RELEASE', label: 'Press Release' },
+              ].map((t) => (
+                <Pressable
+                  key={t.key}
+                  style={[
+                    styles.editorialChip,
+                    { borderColor: colors.border, backgroundColor: colors.surfaceContainer },
+                    editorialTone === t.key && { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
+                  ]}
+                  onPress={() => setEditorialTone(t.key as EditorialTone)}
+                >
+                  <Text
+                    style={[
+                      styles.editorialChipText,
+                      { color: colors.text },
+                      editorialTone === t.key && { color: '#fff', fontWeight: '700' },
+                    ]}
+                  >
+                    {t.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            {/* 4. Sponsored & Notification */}
+            <View style={{ marginTop: 12, gap: 8 }}>
+              <Pressable
+                style={[
+                  styles.editorialToggleRow,
+                  { backgroundColor: colors.surfaceContainer, borderColor: colors.border },
+                  isSponsored && { borderColor: '#10B981' },
+                ]}
+                onPress={() => setIsSponsored(!isSponsored)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="pricetag-outline" size={16} color={isSponsored ? '#10B981' : colors.textMuted} />
+                  <Text style={[styles.editorialToggleText, { color: colors.text }]}>Sponsored / Partner Content</Text>
+                </View>
+                <Ionicons name={isSponsored ? 'checkbox' : 'square-outline'} size={18} color={isSponsored ? '#10B981' : colors.textMuted} />
+              </Pressable>
+
+              {isSponsored && (
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.surfaceContainer, borderColor: colors.border, color: colors.text, marginTop: 4 }]}
+                  value={sponsorName}
+                  onChangeText={setSponsorName}
+                  placeholder="Sponsor / Organization Name"
+                  placeholderTextColor={colors.textLight}
+                />
+              )}
+
+              <Pressable
+                style={[
+                  styles.editorialToggleRow,
+                  { backgroundColor: colors.surfaceContainer, borderColor: colors.border },
+                  sendPushNotification && { borderColor: '#F59E0B' },
+                ]}
+                onPress={() => setSendPushNotification(!sendPushNotification)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="notifications-outline" size={16} color={sendPushNotification ? '#F59E0B' : colors.textMuted} />
+                  <Text style={[styles.editorialToggleText, { color: colors.text }]}>Send Push Notification Alert</Text>
+                </View>
+                <Ionicons name={sendPushNotification ? 'checkbox' : 'square-outline'} size={18} color={sendPushNotification ? '#F59E0B' : colors.textMuted} />
+              </Pressable>
+            </View>
+          </View>
+        )}
+      </View>
+
       {/* Action Buttons: Save Draft & Preview */}
       <View style={styles.actions}>
         <Pressable
@@ -877,11 +1143,43 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
 
           {/* Article Reader Body */}
           <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 120 }}>
-            {/* Category & Date */}
-            <View style={styles.previewMetaRow}>
+            {/* Category & Date & Editorial Badges */}
+            <View style={[styles.previewMetaRow, { flexWrap: 'wrap', gap: 6 }]}>
               <View style={[styles.previewCatPill, { backgroundColor: colors.primarySoft }]}>
                 <Text style={[styles.previewCatText, { color: colors.primary }]}>{selectedCatLabel}</Text>
               </View>
+              {isBreaking ? (
+                <View style={[styles.badgePill, { backgroundColor: '#DC2626' }]}>
+                  <Text style={styles.badgePillText}>⚡ BREAKING</Text>
+                </View>
+              ) : null}
+              {isFeatured ? (
+                <View style={[styles.badgePill, { backgroundColor: '#D97706' }]}>
+                  <Text style={styles.badgePillText}>★ FEATURED</Text>
+                </View>
+              ) : null}
+              {isExclusive ? (
+                <View style={[styles.badgePill, { backgroundColor: '#7C3AED' }]}>
+                  <Text style={styles.badgePillText}>EXCLUSIVE</Text>
+                </View>
+              ) : null}
+              {isLiveCoverage ? (
+                <View style={[styles.badgePill, { backgroundColor: '#E11D48' }]}>
+                  <Text style={styles.badgePillText}>🔴 LIVE</Text>
+                </View>
+              ) : null}
+              {priority === 'CRITICAL' ? (
+                <View style={[styles.badgePill, { backgroundColor: '#9F1239' }]}>
+                  <Text style={styles.badgePillText}>CRITICAL</Text>
+                </View>
+              ) : null}
+              {isSponsored ? (
+                <View style={[styles.badgePill, { backgroundColor: '#059669' }]}>
+                  <Text style={styles.badgePillText}>
+                    SPONSORED {sponsorName ? `· ${sponsorName}` : ''}
+                  </Text>
+                </View>
+              ) : null}
               <Text style={[styles.previewDate, { color: colors.textLight }]}>
                 {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
               </Text>
@@ -918,6 +1216,7 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
             {featuredImage?.url ? (
               <View style={styles.previewImgWrap}>
                 <Image source={{ uri: mediaUrl(featuredImage.url) }} style={styles.previewCoverImg} resizeMode="cover" />
+                <ArticleWatermark />
               </View>
             ) : null}
 
@@ -947,7 +1246,10 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
                   case 'IMAGE':
                     return block.url ? (
                       <View key={block.id} style={styles.previewBlockImgWrap}>
-                        <Image source={{ uri: mediaUrl(block.url) }} style={styles.previewBlockImg} resizeMode="cover" />
+                        <View style={styles.previewBlockImgBox}>
+                          <Image source={{ uri: mediaUrl(block.url) }} style={styles.previewBlockImg} resizeMode="cover" />
+                          <ArticleWatermark />
+                        </View>
                         {block.caption ? (
                           <Text style={[styles.previewBlockCaption, { color: colors.textLight }]}>{block.caption}</Text>
                         ) : null}
@@ -1210,7 +1512,8 @@ const styles = StyleSheet.create({
   previewQuoteWrap: { borderLeftWidth: 4, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 8, marginVertical: 6 },
   previewQuoteText: { fontSize: 16, fontStyle: 'italic', lineHeight: 24 },
   previewBlockImgWrap: { marginVertical: 8 },
-  previewBlockImg: { width: '100%', height: 180, borderRadius: 10 },
+  previewBlockImgBox: { position: 'relative', width: '100%', height: 180, borderRadius: 10, overflow: 'hidden' },
+  previewBlockImg: { width: '100%', height: '100%' },
   previewBlockCaption: { fontSize: 11, textAlign: 'center', marginTop: 4 },
   previewDivider: { borderTopWidth: 1, borderStyle: 'dashed', marginVertical: 12 },
   previewTagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 18 },
@@ -1245,4 +1548,74 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   previewBtnSubmitText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  editorialHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  editorialHeaderTitle: {
+    fontFamily: fonts.sans[700],
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  editorialBox: {
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  subSectionTitle: {
+    fontFamily: fonts.inter[600],
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  editorialChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  editorialChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  editorialChipText: {
+    fontFamily: fonts.inter[600],
+    fontSize: 11.5,
+  },
+  editorialToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  editorialToggleText: {
+    fontFamily: fonts.inter[600],
+    fontSize: 12,
+  },
+  badgePill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgePillText: {
+    color: '#fff',
+    fontFamily: fonts.inter[700],
+    fontSize: 10,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
 })

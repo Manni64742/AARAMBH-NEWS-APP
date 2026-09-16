@@ -230,6 +230,7 @@ export default function HomeScreen({ navigation }: any) {
   const [activeSubCategory, setActiveSubCategory] = useState('')
   const [marketItems, setMarketItems] = useState<MarketIndexItem[]>([])
   const [categoryHeadlines, setCategoryHeadlines] = useState<ContentItem[]>([])
+  const tabCacheRef = useRef<Map<string, { headlines?: ContentItem[]; breaking?: ContentItem[]; trending?: ContentItem[]; ts: number }>>(new Map())
 
   useEffect(() => {
     marketApi.list().then(setMarketItems).catch(() => {})
@@ -259,11 +260,21 @@ export default function HomeScreen({ navigation }: any) {
 
   // Keep master category top headlines loaded so top slider and breaking ticker never collapse
   useEffect(() => {
+    const cacheKey = `hl_${activeCategory || 'home'}_${language}`
+    const cached = tabCacheRef.current.get(cacheKey)
+    if (cached?.headlines && Date.now() - cached.ts < 60000) {
+      setCategoryHeadlines(cached.headlines)
+      return
+    }
     const params: Record<string, any> = { status: 'PUBLISHED', limit: 8, language, sort: 'latest' }
     if (activeCategory) {
       params.category = activeCategory
     }
-    contentApi.list(params).then((r) => setCategoryHeadlines(r.data)).catch(() => setCategoryHeadlines([]))
+    contentApi.list(params).then((r) => {
+      setCategoryHeadlines(r.data)
+      const existing = tabCacheRef.current.get(cacheKey) || { ts: Date.now() }
+      tabCacheRef.current.set(cacheKey, { ...existing, headlines: r.data, ts: Date.now() })
+    }).catch(() => setCategoryHeadlines([]))
   }, [activeCategory, language])
 
   const topTabsScrollRef = useRef<ScrollView>(null)
@@ -466,6 +477,14 @@ export default function HomeScreen({ navigation }: any) {
   const feed = usePagedFeed({ load: loadFeed })
 
   useEffect(() => {
+    const cacheKey = `bt_${activeCategory || 'home'}_${activeSubCategory || ''}_${language}`
+    const cached = tabCacheRef.current.get(cacheKey)
+    if (cached?.breaking && cached?.trending && Date.now() - cached.ts < 60000) {
+      setBreaking(cached.breaking)
+      setTrending(cached.trending)
+      return
+    }
+
     const base: Record<string, any> = { status: 'PUBLISHED', limit: 10, language }
     const breakingParams: Record<string, any> = { ...base, breaking: 'true' }
     const trendingParams: Record<string, any> = { ...base, sort: 'trending', limit: 10 }
@@ -492,8 +511,20 @@ export default function HomeScreen({ navigation }: any) {
       }
     }
 
-    contentApi.list(breakingParams).then((r) => setBreaking(r.data)).catch(() => setBreaking([]))
-    contentApi.list(trendingParams).then((r) => setTrending(r.data)).catch(() => setTrending([]))
+    Promise.all([
+      contentApi.list(breakingParams),
+      contentApi.list(trendingParams),
+    ]).then(([bRes, tRes]) => {
+      const bData = bRes.data || []
+      const tData = tRes.data || []
+      setBreaking(bData)
+      setTrending(tData)
+      const existing = tabCacheRef.current.get(cacheKey) || { ts: Date.now() }
+      tabCacheRef.current.set(cacheKey, { ...existing, breaking: bData, trending: tData, ts: Date.now() })
+    }).catch(() => {
+      setBreaking([])
+      setTrending([])
+    })
   }, [location, activeCategory, activeSubCategory, language])
 
   useEffect(() => {
@@ -533,27 +564,26 @@ export default function HomeScreen({ navigation }: any) {
     interactionApi.toggle(id, 'BOOKMARK').catch(() => {})
   }
 
-  /* Fallback: breaking-flagged items or category headlines or feed items */
-  const validBreaking = (breaking || []).filter((i) => i && i.title)
-  const validFeedBreaking = (feed.items || []).filter((i) => i && i.flags?.isBreaking && i.title)
+  /* Genuine breaking news only - strictly exclude non-breaking articles */
+  const validBreaking = (breaking || []).filter((i) => i && i.title && (i.flags?.isBreaking ?? true))
+  const validFeedBreaking = (feed.items || []).filter((i) => i && i.title && i.flags?.isBreaking)
   const validCatHeadlines = (categoryHeadlines || []).filter((i) => i && i.title)
   const validFeedItems = (feed.items || []).filter((i) => i && i.title)
   const validTrending = (trending || []).filter((i) => i && i.title)
 
-  const breakingItems = validBreaking.length > 0
-    ? validBreaking
-    : validFeedBreaking.length > 0
-      ? validFeedBreaking
-      : validCatHeadlines.length > 0
-        ? validCatHeadlines.slice(0, 5)
-        : validFeedItems.slice(0, 5)
+  const breakingItems = validBreaking.length > 0 ? validBreaking : validFeedBreaking
 
-  /* Slider headlines: always prioritize the freshest published article at position #0 in top hero slider */
-  const newestItem = validFeedItems[0]
-  const otherHeadlines = (validBreaking.length > 0 ? validBreaking : [])
+  /* Featured stories prioritized for top hero slider */
+  const featuredFeedItems = validFeedItems.filter((i) => i.flags?.isFeatured)
+  const nonFeaturedFeedItems = validFeedItems.filter((i) => !i.flags?.isFeatured)
+
+  /* Slider headlines: prioritize featured articles & newest published article */
+  const newestItem = featuredFeedItems[0] || validFeedItems[0]
+  const otherHeadlines = featuredFeedItems
+    .slice(1)
     .concat(validTrending.length > 0 ? validTrending : [])
+    .concat(nonFeaturedFeedItems)
     .concat(validCatHeadlines)
-    .concat(validFeedItems.slice(1))
     .filter((i) => i && i._id && (!newestItem || i._id !== newestItem._id))
 
   const rawHeadlines = (newestItem ? [newestItem, ...otherHeadlines] : otherHeadlines).slice(0, 6)
@@ -566,8 +596,12 @@ export default function HomeScreen({ navigation }: any) {
 
   const sliderList = headlines.length === 1 ? [headlines[0], headlines[0]] : headlines
 
-  /* Feed items: include all valid articles in strict recency order */
-  const feedWithoutHero = validFeedItems
+  /* Feed items: deduplicate items featured in the hero slider so they don't appear twice */
+  const heroIds = useMemo(() => new Set((sliderList || []).map((h) => h._id).filter(Boolean)), [sliderList])
+  const feedWithoutHero = useMemo(() => {
+    const filtered = validFeedItems.filter((i) => !heroIds.has(i._id))
+    return filtered.length > 0 ? filtered : validFeedItems
+  }, [validFeedItems, heroIds])
 
   /* Horizontal sliding items: when subcategory is active, show trending/feed items of that subcategory */
   const marketSlidingItems = validTrending.length > 0 ? validTrending : validFeedItems.slice(0, 8)
@@ -586,6 +620,8 @@ export default function HomeScreen({ navigation }: any) {
       title: bundle.title,
       sectionTitle: bundle.sectionTitle,
       items: bundle.items,
+      categorySlug: bundle.categorySlug,
+      subCategorySlug: bundle.subCategorySlug,
     })
   }
 
@@ -902,7 +938,7 @@ export default function HomeScreen({ navigation }: any) {
     >
       <FlatList
         data={feedWithoutHero}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item._id || (item as any).id}
         renderItem={({ item }) => (
           <NewsCard
             item={item}
@@ -933,6 +969,7 @@ export default function HomeScreen({ navigation }: any) {
           <RefreshControl
             refreshing={feed.refreshing}
             onRefresh={() => {
+              tabCacheRef.current.clear()
               feed.refresh()
               loadHomeBundles()
               categoryApi.tree().then((t) => { if (Array.isArray(t) && t.length > 0) setCategories(t) }).catch(() => {})

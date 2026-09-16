@@ -1,26 +1,119 @@
-import React, { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
+import { contentApi } from '../api/endpoints'
+import { ContentItem } from '../types'
 import { BundleNewsItem, bundleItemToContentItem, getLocalizedTag, isOrangeTag } from '../types/bundles'
 import { fonts, radius, spacing } from '../theme'
 import { ScaledText as Text } from '../components/ScaledText'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
 
+function contentItemToBundleItem(c: ContentItem): BundleNewsItem {
+  return {
+    id: c._id,
+    tag: (c.tags && c.tags[0]) || (c.category?.name?.en) || 'News',
+    title: c.title,
+    summary: c.summary || c.title,
+    imageUrl: c.featuredImage?.url || 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&q=80',
+    publishedAt: c.publishedAt ? new Date(c.publishedAt).toLocaleDateString() : 'Just now',
+    views: c.metrics?.views || 100,
+    _content: c,
+  }
+}
+
 export default function CategoryNewsListScreen({ route, navigation }: any) {
   const { colors: tc, isDark } = useTheme()
   const { language } = useLanguage()
   const insets = useSafeAreaInsets()
 
-  const { title = 'News', items = [] as BundleNewsItem[], sectionTitle } = route.params || {}
-  const [refreshing, setRefreshing] = useState(false)
+  const {
+    title = 'News',
+    items: initialItems = [] as BundleNewsItem[],
+    sectionTitle,
+    categorySlug,
+    subCategorySlug,
+    locationName,
+    locationType,
+  } = route.params || {}
 
-  const onRefresh = () => {
+  const [articleList, setArticleList] = useState<BundleNewsItem[]>(initialItems)
+  const [refreshing, setRefreshing] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+
+  const fetchArticles = useCallback(async (targetPage: number) => {
+    const params: Record<string, any> = {
+      page: targetPage,
+      limit: 15,
+      status: 'PUBLISHED',
+      language,
+    }
+    if (subCategorySlug) {
+      params.subCategory = subCategorySlug
+    } else if (categorySlug) {
+      params.category = categorySlug
+    }
+    if (locationName) {
+      if (locationType === 'state') params.state = locationName
+      else if (locationType === 'district') params.district = locationName
+      else params.city = locationName
+    }
+
+    const res = await contentApi.list(params)
+    const newItems = (res.data || []).map(contentItemToBundleItem)
+    return {
+      items: newItems,
+      hasNext: res.pagination?.hasNextPage ?? (newItems.length >= 15),
+    }
+  }, [categorySlug, subCategorySlug, locationName, locationType, language])
+
+  const onRefresh = useCallback(async () => {
+    if (!categorySlug && !subCategorySlug && !locationName) {
+      setRefreshing(true)
+      setTimeout(() => setRefreshing(false), 500)
+      return
+    }
     setRefreshing(true)
-    setTimeout(() => setRefreshing(false), 600)
-  }
+    try {
+      const { items: freshItems, hasNext } = await fetchArticles(1)
+      if (freshItems.length > 0) {
+        setArticleList(freshItems)
+      }
+      setPage(1)
+      setHasMore(hasNext)
+    } catch {
+    } finally {
+      setRefreshing(false)
+    }
+  }, [categorySlug, subCategorySlug, locationName, fetchArticles])
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || refreshing || !hasMore || (!categorySlug && !subCategorySlug && !locationName)) return
+    setLoadingMore(true)
+    const nextPage = page + 1
+    try {
+      const { items: moreItems, hasNext } = await fetchArticles(nextPage)
+      if (moreItems.length > 0) {
+        setArticleList((prev) => {
+          const existingIds = new Set(prev.map((i) => i.id))
+          const filtered = moreItems.filter((i) => !existingIds.has(i.id))
+          return [...prev, ...filtered]
+        })
+        setPage(nextPage)
+        setHasMore(hasNext)
+      } else {
+        setHasMore(false)
+      }
+    } catch {
+      setHasMore(false)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [loadingMore, refreshing, hasMore, categorySlug, subCategorySlug, locationName, page, fetchArticles])
 
   const openNews = (item: BundleNewsItem) => {
     const fullContent = (item as any)._content || bundleItemToContentItem(item, title)
@@ -66,7 +159,7 @@ export default function CategoryNewsListScreen({ route, navigation }: any) {
 
           <View style={[styles.countBadge, { backgroundColor: tc.surfaceVariant }]}>
             <Text style={[styles.countText, { color: tc.textMuted }]}>
-              {items.length} {language === 'hi' ? 'खबरें' : 'articles'}
+              {articleList.length} {language === 'hi' ? 'खबरें' : 'articles'}
             </Text>
           </View>
         </View>
@@ -74,10 +167,12 @@ export default function CategoryNewsListScreen({ route, navigation }: any) {
 
       {/* Articles List */}
       <FlatList
-        data={items}
+        data={articleList}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

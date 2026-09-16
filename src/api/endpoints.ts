@@ -59,6 +59,14 @@ export const contentApi = {
       return { success: false, data: [] as ContentItem[], pagination: { total: 0, page: 1, limit: 10, totalPages: 1, hasNextPage: false, hasPrevPage: false } }
     }
   },
+  live: async (params: Record<string, any> = {}) => {
+    try {
+      return (await client.get<ApiResponse<ContentItem[]>>('/news', { params: { ...params, live: 'true', status: 'PUBLISHED' } })).data
+    } catch (err) {
+      console.warn('Network error in contentApi.live:', err)
+      return { success: false, data: [] as ContentItem[], pagination: { total: 0, page: 1, limit: 10, totalPages: 1, hasNextPage: false, hasPrevPage: false } }
+    }
+  },
   get: async (identifier: string) => {
     try {
       return (await client.get<ApiResponse<ContentItem>>(`/news/${identifier}`)).data.data
@@ -75,7 +83,15 @@ export const contentApi = {
       return null
     }
   },
-  groupedLatest: async (params: { category?: string; language?: string }) => {
+  homeFeed: async (params?: { language?: string; limit?: number }) => {
+    try {
+      return (await client.get<ApiResponse<any>>('/news/home-feed', { params })).data.data
+    } catch (err) {
+      console.warn('Network error in contentApi.homeFeed:', err)
+      return null
+    }
+  },
+  groupedLatest: async (params: { category?: string; language?: string; page?: number; limit?: number }) => {
     try {
       return (await client.get<ApiResponse<any>>('/news/grouped-latest', { params })).data.data
     } catch (err) {
@@ -91,7 +107,12 @@ export const contentApi = {
     (await client.post<ApiResponse<any>>(`/interactions/${id}/view`)).data,
   related: async (item: ContentItem) => {
     try {
-      const params: Record<string, any> = { limit: 10, status: 'PUBLISHED' }
+      const idOrSlug = item._id || (item as any).slug
+      if (idOrSlug) {
+        const res = await client.get<ApiResponse<ContentItem[]>>(`/news/${idOrSlug}/related?limit=8`)
+        if (res.data?.data && Array.isArray(res.data.data)) return res.data
+      }
+      const params: Record<string, any> = { limit: 8, status: 'PUBLISHED' }
       if (item.category?._id) params.category = item.category._id
       return (await client.get<ApiResponse<ContentItem[]>>('/news', { params })).data
     } catch {

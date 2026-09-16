@@ -1,6 +1,7 @@
 import { Platform } from 'react-native'
 
-export const API_BASE = 'https://api.neelamfoundation.in'
+const RAW_API_BASE = process.env.EXPO_PUBLIC_API_BASE || 'https://api.neelamfoundation.in'
+export const API_BASE = RAW_API_BASE.replace(/\/+$/, '')
 export const API_URL = `${API_BASE}/api/v1`
 
 export const APP_NAME = 'Aarambh News'

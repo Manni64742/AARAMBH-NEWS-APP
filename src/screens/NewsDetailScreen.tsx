@@ -1,5 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Linking, Platform, Pressable, ScrollView, Share, StyleSheet, Text as NativeText, View, TextInput, useWindowDimensions } from 'react-native'
+import {
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text as NativeText,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
@@ -19,6 +32,26 @@ import { AdBanner, showInterstitialIfEnabled } from '../components/AdBanner'
 import { YouTubePlayer } from '../components/YouTubePlayer'
 import { AppBackButton } from '../components/AppBackButton'
 import { videoIdFromUrl } from '../utils/youtube'
+import { ArticleWatermark } from '../components/ArticleWatermark'
+
+function formatCommentTime(dateStr?: string | Date) {
+  if (!dateStr) return 'Recently'
+  try {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000)
+    if (diffSec < 60) return 'Just now'
+    const diffMin = Math.floor(diffSec / 60)
+    if (diffMin < 60) return `${diffMin}m ago`
+    const diffHours = Math.floor(diffMin / 60)
+    if (diffHours < 24) return `${diffHours}h ago`
+    const diffDays = Math.floor(diffHours / 24)
+    if (diffDays < 7) return `${diffDays}d ago`
+    return date.toLocaleDateString()
+  } catch {
+    return 'Recently'
+  }
+}
 
 const stripHtml = (html = '') => html.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
 
@@ -54,7 +87,12 @@ function TextBlockView({ html = '' }: { html?: string }) {
       {parts.map((part, index) => {
         if (/^<img\b/i.test(part)) {
           const source = inlineImageSource(part)
-          return source ? <Image key={`image-${index}`} source={{ uri: source }} style={styles.inlineImage} contentFit="contain" /> : null
+          return source ? (
+            <View key={`image-${index}`} style={styles.inlineImageWrap}>
+              <Image source={{ uri: source }} style={styles.inlineImage} contentFit="contain" />
+              <ArticleWatermark />
+            </View>
+          ) : null
         }
         const text = stripHtml(part)
         return text ? (
@@ -119,12 +157,25 @@ function BlockView({ block }: { block: ArticleBlock }) {
     )
   if (block.type === 'DIVIDER') return <View style={styles.divider} />
   if (block.type === 'IMAGE')
-    return block.url ? <Image source={{ uri: mediaUrl(block.url) }} style={styles.blockImage} contentFit="cover" /> : null
+    return block.url ? (
+      <View style={styles.blockImageWrap}>
+        <View style={styles.blockImageBox}>
+          <Image source={{ uri: mediaUrl(block.url) }} style={styles.blockImage} contentFit="cover" />
+          <ArticleWatermark />
+        </View>
+        {block.caption ? (
+          <NativeText style={[styles.blockImageCaption, { color: colors.textMuted }]}>{block.caption}</NativeText>
+        ) : null}
+      </View>
+    ) : null
   if (block.type === 'GALLERY')
     return (
       <View style={styles.gallery}>
         {(block.items || []).map((it) => (
-          <Image key={it.id} source={{ uri: mediaUrl(it.url) }} style={styles.galleryImage} contentFit="cover" />
+          <View key={it.id} style={styles.galleryImageWrap}>
+            <Image source={{ uri: mediaUrl(it.url) }} style={styles.galleryImage} contentFit="cover" />
+            <ArticleWatermark compact />
+          </View>
         ))}
       </View>
     )
@@ -202,19 +253,19 @@ function BlockView({ block }: { block: ArticleBlock }) {
 export default function NewsDetailScreen() {
   const route = useRoute() as any
   const navigation = useNavigation() as any
-  const { width: screenWidth } = useWindowDimensions()
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions()
   const { success, error } = useToast()
   const { user } = useAuth()
   const { colors: themeColors, fontScale, fontMode, setFontMode, isDark, toggleTheme } = useTheme()
   const [item, setItem] = useState<ContentItem | null>(route.params?.item || null)
   const [comments, setComments] = useState<CommentItem[]>([])
   const [related, setRelated] = useState<ContentItem[]>([])
-  const [relatedTopics, setRelatedTopics] = useState<ContentItem[]>([])
   const [reporter, setReporter] = useState<ReporterPublicProfile | null>(null)
   const [commentText, setCommentText] = useState('')
   const [liked, setLiked] = useState(false)
   const [favorited, setFavorited] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
+  const [commentSheetVisible, setCommentSheetVisible] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [fontMenuOpen, setFontMenuOpen] = useState(false)
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
@@ -248,34 +299,16 @@ export default function NewsDetailScreen() {
       const fresh = await contentApi.get(id)
       if (!fresh) return
       setItem(fresh)
-      const [c, r] = await Promise.all([commentApi.list(id).catch(() => []), contentApi.related(fresh).catch(() => ({ data: [] as ContentItem[] }))])
+      const [c, r] = await Promise.all([
+        commentApi.list(id).catch(() => []),
+        contentApi.related(fresh).catch(() => ({ data: [] as ContentItem[] })),
+      ])
       setComments(c)
-      setRelated(r.data.filter((x) => x._id !== id).slice(0, 8))
+      setRelated((r.data || []).filter((x) => x._id !== id).slice(0, 10))
       if (fresh.author?._id) {
         reporterApi.byUser(fresh.author._id).then(setReporter).catch(() => setReporter(null))
       } else {
         setReporter(null)
-      }
-      if (fresh.tags?.length) {
-        const tags = fresh.tags.slice(0, 3)
-        const results = await Promise.all(
-          tags.map((tag) =>
-            contentApi.list({ search: tag, status: 'PUBLISHED', limit: 6 }).catch(() => ({ data: [] as ContentItem[] }))
-          )
-        )
-        const seen = new Set<string>([id])
-        const merged: ContentItem[] = []
-        results.forEach((list) =>
-          list.data.forEach((x) => {
-            if (!seen.has(x._id) && x.category?._id !== fresh.category?._id) {
-              seen.add(x._id)
-              merged.push(x)
-            }
-          })
-        )
-        setRelatedTopics(merged.slice(0, 8))
-      } else {
-        setRelatedTopics([])
       }
       if (user) {
         const st = await interactionApi.status(id).catch(() => null)
@@ -298,6 +331,7 @@ export default function NewsDetailScreen() {
   const toggle = async (type: 'LIKE' | 'FAVORITE' | 'BOOKMARK') => {
     if (!user) {
       error('Login required')
+      navigation.navigate('Login')
       return
     }
     try {
@@ -306,6 +340,43 @@ export default function NewsDetailScreen() {
       refresh()
     } catch (e) {
       error(errorMessage(e))
+    }
+  }
+
+  const handleSaveToggle = async () => {
+    if (!user) {
+      error('Please login to save stories')
+      navigation.navigate('Login')
+      return
+    }
+    const next = !bookmarked
+    setBookmarked(next)
+    try {
+      const res = await interactionApi.toggle(id, 'BOOKMARK')
+      success(next ? 'Article saved to bookmarks' : 'Article removed from saved')
+    } catch (e) {
+      setBookmarked(!next)
+      error(errorMessage(e))
+    }
+  }
+
+  const handleNativeShare = async () => {
+    if (!item) return
+    const url = `https://aarambhnews.com/news/${item.slug || item._id}`
+    const text = `${item.title}\n\n${url}`
+    try {
+      await Share.share(
+        {
+          title: item.title,
+          message: text,
+          url: Platform.OS === 'ios' ? url : undefined,
+        },
+        {
+          dialogTitle: `Share: ${item.title}`,
+        }
+      )
+    } catch (err) {
+      console.warn('Share error:', err)
     }
   }
 
@@ -335,12 +406,17 @@ export default function NewsDetailScreen() {
     if (!commentText.trim()) return
     if (!user) {
       error('Login required to comment')
+      navigation.navigate('Login')
       return
     }
+    const textToSend = commentText.trim()
     try {
-      await commentApi.add(id, commentText.trim())
+      const added = await commentApi.add(id, textToSend)
       setCommentText('')
       success('Comment added')
+      if (added && (added as any)._id) {
+        setComments((prev) => [added as any, ...prev])
+      }
       refresh()
     } catch (e) {
       error(errorMessage(e))
@@ -369,7 +445,7 @@ export default function NewsDetailScreen() {
     <View style={[styles.safe, { backgroundColor: themeColors.background }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: headerTotalHeight, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingTop: headerTotalHeight, paddingBottom: 76 + Math.max(insets.bottom, 12) }}
         scrollIndicatorInsets={{ top: headerTotalHeight }}
       >
 
@@ -395,7 +471,43 @@ export default function NewsDetailScreen() {
                 </Text>
               </View>
             ) : null}
-            {item.flags?.isBreaking ? <Text style={styles.breaking}>BREAKING</Text> : null}
+            {item.flags?.isBreaking ? (
+              <View style={[styles.badgePill, { backgroundColor: '#DC2626' }]}>
+                <Text style={styles.badgePillText}>⚡ BREAKING</Text>
+              </View>
+            ) : null}
+            {item.flags?.isFeatured ? (
+              <View style={[styles.badgePill, { backgroundColor: '#D97706' }]}>
+                <Text style={styles.badgePillText}>★ FEATURED</Text>
+              </View>
+            ) : null}
+            {item.flags?.isExclusive ? (
+              <View style={[styles.badgePill, { backgroundColor: '#7C3AED' }]}>
+                <Text style={styles.badgePillText}>EXCLUSIVE</Text>
+              </View>
+            ) : null}
+            {item.flags?.isLiveCoverage ? (
+              <View style={[styles.badgePill, { backgroundColor: '#E11D48' }]}>
+                <Text style={styles.badgePillText}>🔴 LIVE</Text>
+              </View>
+            ) : null}
+            {item.flags?.priority === 'CRITICAL' ? (
+              <View style={[styles.badgePill, { backgroundColor: '#9F1239' }]}>
+                <Text style={styles.badgePillText}>CRITICAL</Text>
+              </View>
+            ) : null}
+            {item.flags?.isSponsored ? (
+              <View style={[styles.badgePill, { backgroundColor: '#059669' }]}>
+                <Text style={styles.badgePillText}>
+                  SPONSORED {item.flags.sponsorName ? `· ${item.flags.sponsorName}` : ''}
+                </Text>
+              </View>
+            ) : null}
+            {item.flags?.isUpdated ? (
+              <View style={[styles.badgePill, { backgroundColor: '#0284C7' }]}>
+                <Text style={styles.badgePillText}>UPDATED</Text>
+              </View>
+            ) : null}
           </View>
           {ytVideoId ? (
             <View style={styles.ytHeroWrap}>
@@ -408,16 +520,19 @@ export default function NewsDetailScreen() {
               <Image source={{ uri: image }} style={styles.hero} contentFit="cover" transition={200} />
               
               {!captionVisible && (
-                <View style={styles.heroControls}>
-                  <Pressable
-                    style={styles.heroControlBtn}
-                    onPress={toggleCaption}
-                    hitSlop={8}
-                    accessibilityLabel="Image Info"
-                  >
-                    <Ionicons name="information-circle-outline" size={20} color="#fff" />
-                  </Pressable>
-                </View>
+                <>
+                  <ArticleWatermark />
+                  <View style={styles.heroControls}>
+                    <Pressable
+                      style={styles.heroControlBtn}
+                      onPress={toggleCaption}
+                      hitSlop={8}
+                      accessibilityLabel="Image Info"
+                    >
+                      <Ionicons name="information-circle-outline" size={20} color="#fff" />
+                    </Pressable>
+                  </View>
+                </>
               )}
 
               {captionVisible && (
@@ -464,6 +579,18 @@ export default function NewsDetailScreen() {
               ) : null}
             </View>
           </View>
+
+          {item.flags?.isCorrection && item.flags?.correctionNote ? (
+            <View style={[styles.correctionBox, { backgroundColor: isDark ? '#2D2006' : '#FEF3C7', borderColor: isDark ? '#78350F' : '#F59E0B' }]}>
+              <View style={styles.correctionHeader}>
+                <Ionicons name="alert-circle" size={15} color={isDark ? '#FBBF24' : '#B45309'} />
+                <Text style={[styles.correctionTitle, { color: isDark ? '#FBBF24' : '#B45309' }]}>CORRECTION</Text>
+              </View>
+              <Text style={[styles.correctionBody, { color: isDark ? '#FDE68A' : '#92400E' }]}>
+                {item.flags.correctionNote}
+              </Text>
+            </View>
+          ) : null}
 
           {(item.bodyBlocks || []).map((block) => (
             <BlockView key={block.id} block={block} />
@@ -562,23 +689,11 @@ export default function NewsDetailScreen() {
           ) : null}
         </View>
 
-        {/* Related Topics — tag-based, cross-category */}
-        {relatedTopics.length > 0 ? (
-          <View>
-            <View style={{ paddingHorizontal: 16 }}>
-              <SectionHeader title="Related Topics" />
-            </View>
-            {relatedTopics.slice(0, 4).map((rel) => (
-              <NewsCard key={rel._id} item={rel} compact onPress={() => navigation.push('NewsDetail', { item: rel })} />
-            ))}
-          </View>
-        ) : null}
-
-        {/* Similar News — same category, rendered OUTSIDE the padded body to avoid double margins */}
+        {/* Suggested News — strictly category & subcategory relevant */}
         {related.length > 0 ? (
-          <View>
+          <View style={styles.suggestedNewsSection}>
             <View style={{ paddingHorizontal: 16 }}>
-              <SectionHeader title="Similar News" />
+              <SectionHeader title="Suggested News" />
             </View>
             {related.map((rel) => (
               <NewsCard key={rel._id} item={rel} compact onPress={() => navigation.push('NewsDetail', { item: rel })} />
@@ -629,6 +744,196 @@ export default function NewsDetailScreen() {
           </View>
         ) : null}
       </View>
+
+      {/* Full-Width Bottom Action Bar: [ Share ]      [ 💬 3 ]      [ Save ] */}
+      <View
+        style={[
+          styles.bottomActionBar,
+          {
+            backgroundColor: isDark ? '#121417' : '#FFFFFF',
+            borderTopColor: isDark ? '#252830' : '#E3E2E4',
+            paddingBottom: Math.max(insets.bottom, 10),
+          },
+        ]}
+      >
+        <View style={styles.bottomActionInner}>
+          {/* Share Action */}
+          <Pressable
+            style={({ pressed }) => [styles.bottomActionBtn, pressed && styles.actionBtnPressed]}
+            onPress={handleNativeShare}
+            accessibilityLabel="Share Article"
+            accessibilityRole="button"
+            hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}
+          >
+            <Ionicons name="share-social-outline" size={23} color={themeColors.text} />
+          </Pressable>
+
+          {/* Comment Action: clean icon + count side-by-side */}
+          <Pressable
+            style={({ pressed }) => [styles.bottomActionBtn, pressed && styles.actionBtnPressed]}
+            onPress={() => setCommentSheetVisible(true)}
+            accessibilityLabel="Article Comments"
+            accessibilityRole="button"
+            hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}
+          >
+            <View style={styles.commentBtnContent}>
+              <Ionicons name="chatbubble-ellipses-outline" size={23} color={themeColors.text} />
+              <Text style={[styles.bottomCommentCountText, { color: themeColors.text }]}>
+                {comments.length}
+              </Text>
+            </View>
+          </Pressable>
+
+          {/* Save / Bookmark Action */}
+          <Pressable
+            style={({ pressed }) => [styles.bottomActionBtn, pressed && styles.actionBtnPressed]}
+            onPress={handleSaveToggle}
+            accessibilityLabel={bookmarked ? 'Remove from Saved' : 'Save Article'}
+            accessibilityRole="button"
+            hitSlop={{ top: 10, bottom: 10, left: 16, right: 16 }}
+          >
+            <Ionicons
+              name={bookmarked ? 'bookmark' : 'bookmark-outline'}
+              size={23}
+              color={bookmarked ? themeColors.primary : themeColors.text}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Compact Comments Bottom Sheet Modal */}
+      <Modal
+        visible={commentSheetVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setCommentSheetVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.commentModalOverlay}
+        >
+          <Pressable
+            style={styles.commentModalBackdrop}
+            onPress={() => setCommentSheetVisible(false)}
+          />
+          <View
+            style={[
+              styles.commentSheetContainer,
+              {
+                backgroundColor: themeColors.card,
+                borderTopColor: themeColors.border,
+                paddingBottom: Math.max(insets.bottom, 12),
+                maxHeight: Math.min(screenHeight * 0.75, 620),
+              },
+            ]}
+          >
+            {/* Handle bar */}
+            <View style={styles.sheetHandleWrap}>
+              <View style={[styles.sheetHandle, { backgroundColor: themeColors.border }]} />
+            </View>
+
+            {/* Sheet Header */}
+            <View style={[styles.commentSheetHeader, { borderBottomColor: themeColors.border }]}>
+              <View style={styles.commentSheetHeaderLeft}>
+                <Ionicons name="chatbubbles-outline" size={20} color={themeColors.primary} />
+                <Text style={[styles.commentSheetTitle, { color: themeColors.text }]}>Comments</Text>
+                <View style={[styles.commentCountPill, { backgroundColor: themeColors.surfaceVariant }]}>
+                  <Text style={[styles.commentCountPillText, { color: themeColors.textMuted }]}>
+                    {comments.length}
+                  </Text>
+                </View>
+              </View>
+              <Pressable
+                style={styles.commentSheetCloseBtn}
+                onPress={() => setCommentSheetVisible(false)}
+                hitSlop={10}
+                accessibilityLabel="Close comments"
+              >
+                <Ionicons name="close" size={22} color={themeColors.textMuted} />
+              </Pressable>
+            </View>
+
+            {/* Comments List */}
+            <ScrollView
+              style={styles.commentListScroll}
+              contentContainerStyle={styles.commentListContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={true}
+            >
+              {comments.length === 0 ? (
+                <View style={styles.emptyCommentsWrap}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={44} color={themeColors.textLight} />
+                  <Text style={[styles.emptyCommentsTitle, { color: themeColors.text }]}>No comments yet</Text>
+                  <Text style={[styles.emptyCommentsSub, { color: themeColors.textMuted }]}>
+                    Be the first to share your thoughts on this story!
+                  </Text>
+                </View>
+              ) : (
+                comments.map((c) => (
+                  <View key={c._id} style={[styles.sheetCommentItem, { borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)' }]}>
+                    <View style={[styles.sheetCommentAvatar, { backgroundColor: themeColors.primarySoft }]}>
+                      <Text style={[styles.sheetCommentAvatarText, { color: themeColors.primary }]}>
+                        {(c.userId?.name || 'U').charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.sheetCommentBody}>
+                      <View style={styles.sheetCommentMetaRow}>
+                        <Text style={[styles.sheetCommentAuthor, { color: themeColors.text }]}>
+                          {c.userId?.name || 'Reader'}
+                        </Text>
+                        <Text style={[styles.sheetCommentTime, { color: themeColors.textLight }]}>
+                          {formatCommentTime(c.createdAt)}
+                        </Text>
+                      </View>
+                      <Text style={[styles.sheetCommentText, { color: themeColors.text }]}>
+                        {c.commentText}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+
+            {/* Fixed Comment Input at Bottom of Sheet */}
+            <View style={[styles.sheetInputBar, { borderTopColor: themeColors.border, backgroundColor: themeColors.card }]}>
+              <TextInput
+                style={[
+                  styles.sheetTextInput,
+                  {
+                    backgroundColor: themeColors.surfaceVariant,
+                    borderColor: themeColors.border,
+                    color: themeColors.text,
+                  },
+                ]}
+                value={commentText}
+                onChangeText={setCommentText}
+                placeholder={user ? "Write a comment..." : "Login to write a comment..."}
+                placeholderTextColor={themeColors.textLight}
+                multiline={false}
+                returnKeyType="send"
+                onSubmitEditing={addComment}
+              />
+              <Pressable
+                style={[
+                  styles.sheetSendBtn,
+                  {
+                    backgroundColor: commentText.trim() ? themeColors.primary : themeColors.border,
+                  },
+                ]}
+                onPress={addComment}
+                disabled={!commentText.trim()}
+                accessibilityLabel="Send Comment"
+              >
+                <Ionicons
+                  name="send"
+                  size={16}
+                  color={commentText.trim() ? '#fff' : themeColors.textLight}
+                />
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   )
 }
@@ -743,14 +1048,38 @@ const styles = StyleSheet.create({
   },
   articleText: { fontFamily: fonts.sans[400], fontSize: 18, lineHeight: 30, color: colors.text, marginTop: 18 },
   articleFlow: { marginTop: 18 },
-  inlineImage: { width: '100%', height: 230, borderRadius: 10, marginVertical: 10 },
+  inlineImageWrap: {
+    position: 'relative',
+    width: '100%',
+    height: 230,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginVertical: 10,
+  },
+  inlineImage: { width: '100%', height: '100%' },
   blockHeading: { fontFamily: fonts.sans[700], fontSize: 20, color: colors.text, marginTop: 22 },
   quote: { borderLeftWidth: 4, borderLeftColor: colors.primary, backgroundColor: colors.primarySoft, padding: 15, marginTop: 16, borderRadius: 8 },
   quoteText: { fontFamily: fonts.inter[400], fontSize: 16, fontStyle: 'italic', color: colors.text, lineHeight: 24 },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: 16 },
-  blockImage: { width: '100%', height: 200, borderRadius: 10, marginTop: 14 },
+  blockImageWrap: { marginTop: 14 },
+  blockImageBox: {
+    position: 'relative',
+    width: '100%',
+    height: 220,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  blockImage: { width: '100%', height: '100%' },
+  blockImageCaption: { fontSize: 12, textAlign: 'center', marginTop: 4 },
   gallery: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
-  galleryImage: { width: '48%', height: 120, borderRadius: 8 },
+  galleryImageWrap: {
+    position: 'relative',
+    width: '48%',
+    height: 120,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  galleryImage: { width: '100%', height: '100%' },
   blockVideo: { width: '100%', height: 220, marginTop: 14, borderRadius: 10 },
   blockYtWrap: { width: '100%', aspectRatio: 16 / 9, borderRadius: 10, overflow: 'hidden', marginVertical: 14, backgroundColor: '#000' },
   blockYtTitle: { fontSize: 12, marginTop: 6, fontWeight: '500' },
@@ -787,4 +1116,235 @@ const styles = StyleSheet.create({
   reporterInfo: { flex: 1 },
   reporterName: { fontFamily: fonts.inter[700], fontSize: 14, fontWeight: '700' },
   reporterMeta: { fontFamily: fonts.inter[500], fontSize: 12, marginTop: 2 },
+  badgePill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgePillText: {
+    color: '#fff',
+    fontFamily: fonts.inter[700],
+    fontSize: 10,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  correctionBox: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  correctionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  correctionTitle: {
+    fontFamily: fonts.inter[700],
+    fontSize: 11,
+    letterSpacing: 0.5,
+  },
+  correctionBody: {
+    fontFamily: fonts.inter[500],
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  bottomActionBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    zIndex: 40,
+    borderTopWidth: 1,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+  },
+  bottomActionInner: {
+    width: '100%',
+    maxWidth: 540,
+    alignSelf: 'center',
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  bottomActionBtn: {
+    flex: 1,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commentBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  bottomCommentCountText: {
+    fontFamily: fonts.inter[600],
+    fontSize: 14,
+    includeFontPadding: false,
+  },
+  actionBtnPressed: {
+    opacity: 0.55,
+  },
+  suggestedNewsSection: {
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  commentModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.52)',
+  },
+  commentModalBackdrop: {
+    flex: 1,
+  },
+  commentSheetContainer: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderTopWidth: 1,
+    elevation: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    overflow: 'hidden',
+  },
+  sheetHandleWrap: {
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  sheetHandle: {
+    width: 38,
+    height: 4.5,
+    borderRadius: 2.5,
+  },
+  commentSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  commentSheetHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  commentSheetTitle: {
+    fontFamily: fonts.sans[700],
+    fontSize: 17,
+    letterSpacing: -0.2,
+  },
+  commentCountPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  commentCountPillText: {
+    fontFamily: fonts.inter[700],
+    fontSize: 11.5,
+  },
+  commentSheetCloseBtn: {
+    padding: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commentListScroll: {
+    flex: 1,
+  },
+  commentListContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexGrow: 1,
+  },
+  emptyCommentsWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    gap: 8,
+  },
+  emptyCommentsTitle: {
+    fontFamily: fonts.sans[700],
+    fontSize: 16,
+    marginTop: 6,
+  },
+  emptyCommentsSub: {
+    fontFamily: fonts.inter[400],
+    fontSize: 13,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+  sheetCommentItem: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+  },
+  sheetCommentAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetCommentAvatarText: {
+    fontFamily: fonts.inter[700],
+    fontSize: 15,
+  },
+  sheetCommentBody: {
+    flex: 1,
+    gap: 3,
+  },
+  sheetCommentMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sheetCommentAuthor: {
+    fontFamily: fonts.inter[700],
+    fontSize: 13,
+  },
+  sheetCommentTime: {
+    fontFamily: fonts.inter[400],
+    fontSize: 11,
+  },
+  sheetCommentText: {
+    fontFamily: fonts.sans[400],
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  sheetInputBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  sheetTextInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    fontSize: 14,
+    minHeight: 40,
+  },
+  sheetSendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 })

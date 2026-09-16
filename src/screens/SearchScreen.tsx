@@ -1,8 +1,8 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { FlatList, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { contentApi, locationApi, searchApi } from '../api/endpoints'
+import { categoryApi, contentApi, locationApi } from '../api/endpoints'
 import { CategoryItem, ContentItem, LocationItem } from '../types'
 import { colors, fonts } from '../theme'
 import { NewsCard, CategoryChip } from '../components/NewsCard'
@@ -20,8 +20,15 @@ export default function SearchScreen({ navigation }: any) {
   const [results, setResults] = useState<ContentItem[]>([])
   const [locations, setLocations] = useState<LocationItem[]>([])
   const [categories, setCategories] = useState<CategoryItem[]>([])
+  const [allCategories, setAllCategories] = useState<CategoryItem[]>([])
   const [searching, setSearching] = useState(false)
   const [searched, setSearched] = useState(false)
+
+  useEffect(() => {
+    categoryApi.list().then((cats) => {
+      if (Array.isArray(cats)) setAllCategories(cats)
+    }).catch(() => {})
+  }, [])
 
   const run = async () => {
     const q = query.trim()
@@ -31,18 +38,23 @@ export default function SearchScreen({ navigation }: any) {
     try {
       const params: Record<string, any> = { status: 'PUBLISHED', limit: 30 }
       if (filter === 'Videos' || filter === 'Shorts') params.contentType = filter === 'Videos' ? 'VIDEO' : 'SHORT_VIDEO'
-      if (filter === 'All' || filter === 'News') params.search = q
-      else if (filter === 'Videos' || filter === 'Shorts') params.search = q
-      const [contentRes, locRes, catRes, allRes] = await Promise.all([
+      params.search = q
+
+      const [contentRes, locRes] = await Promise.all([
         contentApi.list(params),
-        locationApi.search(q),
-        (await import('../api/endpoints')).categoryApi.list(),
-        filter === 'All' ? searchApi.all(q, 1, 10) : Promise.resolve(null),
+        locationApi.search(q).catch(() => []),
       ])
-      setResults(contentRes.data)
-      setLocations(locRes)
-      setCategories(catRes.filter((c) => c.name.en.toLowerCase().includes(q.toLowerCase())))
-      if (allRes && allRes.data?.categories) setCategories((prev) => (prev.length ? prev : allRes.data.categories))
+      setResults(contentRes?.data || [])
+      setLocations(Array.isArray(locRes) ? locRes : [])
+
+      const lowerQ = q.toLowerCase()
+      setCategories(
+        allCategories.filter((c) =>
+          c.name?.en?.toLowerCase().includes(lowerQ) ||
+          c.name?.hi?.toLowerCase().includes(lowerQ) ||
+          c.slug?.toLowerCase().includes(lowerQ)
+        )
+      )
     } catch {
     } finally {
       setSearching(false)
@@ -58,7 +70,15 @@ export default function SearchScreen({ navigation }: any) {
             <Pressable
               key={loc._id}
               style={styles.locationItem}
-              onPress={() => navigation.navigate('NewsDetail', { item: { _id: loc._id } as any })}
+              onPress={() => {
+                const locName = loc.name?.en || loc.name?.hi || ''
+                navigation.navigate('CategoryNewsList', {
+                  title: locName,
+                  sectionTitle: 'Location News',
+                  locationName: locName,
+                  locationType: (loc as any).type || 'city',
+                })
+              }}
             >
               <Ionicons name="location-outline" size={16} color={themeColors.primary} />
               <Text style={[styles.locationText, { color: themeColors.text }]}>{loc.name?.en || loc.name?.hi || ''}</Text>

@@ -74,6 +74,33 @@ export interface LocationItem {
   isActive?: boolean
 }
 
+export type PriorityLevel = 'NORMAL' | 'HIGH' | 'CRITICAL'
+export type EditorialTone = 'NEWS' | 'OPINION' | 'ANALYSIS' | 'INTERVIEW' | 'EXPLAINER' | 'REPORT' | 'PRESS_RELEASE'
+export type SponsorType = 'NONE' | 'SPONSORED' | 'PARTNER' | 'ADVERTISEMENT'
+
+export interface EditorialFlags {
+  isBreaking?: boolean
+  breakingPriority?: number
+  breakingExpiresAt?: string
+  isFeatured?: boolean
+  priority?: PriorityLevel
+  isLiveCoverage?: boolean
+  isDeveloping?: boolean
+  isExclusive?: boolean
+  editorialTone?: EditorialTone
+  isSponsored?: boolean
+  sponsorType?: SponsorType
+  sponsorName?: string
+  isPressRelease?: boolean
+  isUpdated?: boolean
+  isCorrection?: boolean
+  correctionNote?: string
+  showOnHome?: boolean
+  isEditorPick?: boolean
+  sendPushNotification?: boolean
+  [key: string]: any
+}
+
 export interface ContentItem {
   _id: string
   title: string
@@ -90,12 +117,13 @@ export interface ContentItem {
   language?: string
   location?: { primary?: any; scope?: string }
   featuredImage?: { url: string; caption?: string; alt?: string; credit?: string }
-  flags?: { isBreaking?: boolean; isFeatured?: boolean }
+  flags?: EditorialFlags
   metrics?: { views?: number; uniqueViewers?: number; likes?: number; shares?: number; comments?: number }
   viewsCount?: number
   likesCount?: number
   trendingScore?: number
   publishedAt?: string
+  scheduledFor?: string
   createdAt: string
   updatedAt?: string
   videoPayload?: { videoUrl: string; thumbnail?: string; duration?: number }
