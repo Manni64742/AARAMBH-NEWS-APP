@@ -71,6 +71,9 @@ const INDIAN_LOCATIONS = [
 
 const DRAFT_TTL = 1000 * 60 * 60 * 24 * 3
 
+const VISIBLE_CATEGORY_LIMIT = 12
+const VISIBLE_SUB_CATEGORY_LIMIT = 10
+
 export default function SubmitNewsScreen({ navigation, route }: any) {
   const { success, error } = useToast()
   const { colors } = useTheme()
@@ -108,6 +111,10 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
   const [showLocationModal, setShowLocationModal] = useState(false)
   const [locationSearch, setLocationSearch] = useState('')
   const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [categorySearch, setCategorySearch] = useState('')
+  const [showSubCategoryModal, setShowSubCategoryModal] = useState(false)
+  const [subCategorySearch, setSubCategorySearch] = useState('')
 
   useEffect(() => {
     navigation.setOptions({ title: editing ? 'Edit Article' : 'Create Article' })
@@ -287,6 +294,30 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
   const selectedCatObj = categories.find((c) => c._id === category)
   const availableSubCats = (selectedCatObj?.subCategories || []).filter((s) => s.isActive !== false)
 
+  const catName = (c: CategoryItem) =>
+    (language === 'hi' ? (c.name?.hi || c.name?.en) : (c.name?.en || c.name?.hi)) || ''
+
+  const catsWithSelectedFirst = category
+    ? [...categories.filter((c) => c._id === category), ...categories.filter((c) => c._id !== category)]
+    : categories
+  const visibleCategories = catsWithSelectedFirst.slice(0, VISIBLE_CATEGORY_LIMIT)
+  const showMoreCategoryBtn = categories.length > VISIBLE_CATEGORY_LIMIT
+  const filteredCategories = categories.filter((c) => {
+    if (!categorySearch.trim()) return true
+    return catName(c).toLowerCase().includes(categorySearch.trim().toLowerCase())
+  })
+
+  const subsWithSelectedFirst = subCategory
+    ? [...availableSubCats.filter((s) => s._id === subCategory), ...availableSubCats.filter((s) => s._id !== subCategory)]
+    : availableSubCats
+  const visibleSubCats = subsWithSelectedFirst.slice(0, VISIBLE_SUB_CATEGORY_LIMIT)
+  const showMoreSubCategoryBtn = availableSubCats.length > VISIBLE_SUB_CATEGORY_LIMIT
+  const filteredSubCats = availableSubCats.filter((s) => {
+    if (!subCategorySearch.trim()) return true
+    const n = (language === 'hi' ? (s.name?.hi || s.name?.en) : (s.name?.en || s.name?.hi)) || ''
+    return n.toLowerCase().includes(subCategorySearch.trim().toLowerCase())
+  })
+
   const selectedCatLabel = selectedCatObj
     ? (language === 'hi' ? (selectedCatObj.name?.hi || selectedCatObj.name?.en) : (selectedCatObj.name?.en || selectedCatObj.name?.hi))
     : (language === 'hi' ? 'सभी / राष्ट्रीय' : 'All / National')
@@ -444,9 +475,9 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
           </Text>
         </Pressable>
 
-        {categories.map((cat) => {
+        {visibleCategories.map((cat) => {
           const isSelected = category === cat._id
-          const catName = language === 'hi' ? (cat.name?.hi || cat.name?.en) : (cat.name?.en || cat.name?.hi)
+          const catNameText = catName(cat)
           return (
             <Pressable
               key={cat._id}
@@ -461,11 +492,21 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
               }}
             >
               <Text style={[styles.catChipText, { color: colors.textMuted }, isSelected && styles.catChipTextActive]}>
-                {catName}
+                {catNameText}
               </Text>
             </Pressable>
           )
         })}
+
+        {showMoreCategoryBtn && (
+          <Pressable
+            style={[styles.catChip, styles.moreChip, { borderColor: colors.primary }]}
+            onPress={() => setShowCategoryModal(true)}
+          >
+            <Ionicons name="add" size={12} color={colors.primary} />
+            <Text style={[styles.moreChipText, { color: colors.primary }]}>MORE CATEGORY</Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Dynamic Sub-Category Selection (Full-width wrapping, NO horizontal scroll) */}
@@ -485,7 +526,7 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
                 {language === 'hi' ? 'सभी / मुख्य' : 'All / General'}
               </Text>
             </Pressable>
-            {availableSubCats.map((sub) => {
+            {visibleSubCats.map((sub) => {
               const isSubSelected = subCategory === sub._id
               const subName = language === 'hi' ? (sub.name?.hi || sub.name?.en) : (sub.name?.en || sub.name?.hi)
               return (
@@ -510,6 +551,16 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
                 </Pressable>
               )
             })}
+
+            {showMoreSubCategoryBtn && (
+              <Pressable
+                style={[styles.subCatChip, styles.moreChip, { borderColor: colors.primary }]}
+                onPress={() => setShowSubCategoryModal(true)}
+              >
+                <Ionicons name="add" size={12} color={colors.primary} />
+                <Text style={[styles.moreChipText, { color: colors.primary }]}>MORE SUB-CATEGORY</Text>
+              </Pressable>
+            )}
           </View>
         </>
       )}
@@ -688,6 +739,120 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
                       </Text>
                     </View>
                     {isSelected && <Ionicons name="checkmark-circle" size={18} color={colors.primary} />}
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Category Picker Modal (searchable + scrollable) */}
+      <Modal visible={showCategoryModal} transparent animationType="slide" onRequestClose={() => setShowCategoryModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Category</Text>
+              <Pressable onPress={() => setShowCategoryModal(false)} hitSlop={10}>
+                <Ionicons name="close" size={22} color={colors.text} />
+              </Pressable>
+            </View>
+
+            <View style={[styles.searchBox, { backgroundColor: colors.surfaceContainer, borderColor: colors.border }]}>
+              <Ionicons name="search" size={16} color={colors.textLight} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.text }]}
+                value={categorySearch}
+                onChangeText={setCategorySearch}
+                placeholder="Search categories..."
+                placeholderTextColor={colors.textLight}
+              />
+            </View>
+
+            <ScrollView style={{ maxHeight: 380 }}>
+              {filteredCategories.length === 0 && (
+                <Text style={[styles.modalEmpty, { color: colors.textMuted }]}>No categories found</Text>
+              )}
+              {filteredCategories.map((c) => {
+                const isCSelected = category === c._id
+                return (
+                  <Pressable
+                    key={c._id}
+                    style={[
+                      styles.modalOption,
+                      { borderBottomColor: colors.border },
+                      isCSelected && { backgroundColor: colors.primarySoft },
+                    ]}
+                    onPress={() => {
+                      setCategory(c._id)
+                      setSubCategory('')
+                      setShowCategoryModal(false)
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Ionicons name="pricetag-outline" size={18} color={isCSelected ? colors.primary : colors.textLight} />
+                      <Text style={[styles.modalOptionText, { color: isCSelected ? colors.primary : colors.text }]}>
+                        {catName(c)}
+                      </Text>
+                    </View>
+                    {isCSelected && <Ionicons name="checkmark-circle" size={18} color={colors.primary} />}
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Sub-Category Picker Modal (searchable + scrollable) */}
+      <Modal visible={showSubCategoryModal} transparent animationType="slide" onRequestClose={() => setShowSubCategoryModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalBox, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Sub-Category</Text>
+              <Pressable onPress={() => setShowSubCategoryModal(false)} hitSlop={10}>
+                <Ionicons name="close" size={22} color={colors.text} />
+              </Pressable>
+            </View>
+
+            <View style={[styles.searchBox, { backgroundColor: colors.surfaceContainer, borderColor: colors.border }]}>
+              <Ionicons name="search" size={16} color={colors.textLight} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.text }]}
+                value={subCategorySearch}
+                onChangeText={setSubCategorySearch}
+                placeholder="Search sub-categories..."
+                placeholderTextColor={colors.textLight}
+              />
+            </View>
+
+            <ScrollView style={{ maxHeight: 380 }}>
+              {filteredSubCats.length === 0 && (
+                <Text style={[styles.modalEmpty, { color: colors.textMuted }]}>No sub-categories found</Text>
+              )}
+              {filteredSubCats.map((s) => {
+                const isSSelected = subCategory === s._id
+                const subName = language === 'hi' ? (s.name?.hi || s.name?.en) : (s.name?.en || s.name?.hi)
+                return (
+                  <Pressable
+                    key={s._id}
+                    style={[
+                      styles.modalOption,
+                      { borderBottomColor: colors.border },
+                      isSSelected && { backgroundColor: colors.primarySoft },
+                    ]}
+                    onPress={() => {
+                      setSubCategory(s._id)
+                      setShowSubCategoryModal(false)
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Ionicons name="git-branch-outline" size={18} color={isSSelected ? colors.primary : colors.textLight} />
+                      <Text style={[styles.modalOptionText, { color: isSSelected ? colors.primary : colors.text }]}>
+                        {subName}
+                      </Text>
+                    </View>
+                    {isSSelected && <Ionicons name="checkmark-circle" size={18} color={colors.primary} />}
                   </Pressable>
                 )
               })}
@@ -991,6 +1156,9 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
   modalOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   modalOptionText: { fontSize: 14, fontWeight: '600' },
+  modalEmpty: { textAlign: 'center', fontSize: 13, paddingVertical: 18 },
+  moreChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'transparent', borderStyle: 'dashed' },
+  moreChipText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
 
   // Reader Preview Styles
   previewContainer: { flex: 1 },

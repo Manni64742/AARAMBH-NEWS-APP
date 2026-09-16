@@ -1,5 +1,6 @@
 import { Platform } from 'react-native'
 import * as Notifications from 'expo-notifications'
+import Constants from 'expo-constants'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import axios from 'axios'
 import { API_URL } from '../config'
@@ -19,7 +20,10 @@ const DEVICE_ID_KEY = 'aarambh_unique_device_id'
 const PUSH_TOKEN_KEY = 'aarambh_expo_push_token'
 const LAST_PROCESSED_NEWS_ID_KEY = 'aarambh_last_processed_news_id'
 const UNREAD_COUNT_KEY = 'aarambh_unread_notif_count'
-const EAS_PROJECT_ID = 'be1cca30-db67-4709-a407-f3c830ee556a'
+const EAS_PROJECT_ID =
+  (Constants.expoConfig?.extra?.eas?.projectId as string | undefined) ??
+  (Constants.easConfig?.projectId as string | undefined) ??
+  null
 
 type UnreadListener = (count: number) => void
 const unreadListeners: Set<UnreadListener> = new Set()
@@ -116,9 +120,9 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     // Retrieve Expo Push Token with explicit projectId
     let token: string | null = null
     try {
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: EAS_PROJECT_ID,
-      })
+      const tokenData = await Notifications.getExpoPushTokenAsync(
+        EAS_PROJECT_ID ? { projectId: EAS_PROJECT_ID } : undefined
+      )
       token = tokenData.data
     } catch (pushErr: any) {
       console.log('[Notification] Expo push token fetch note:', pushErr?.message)

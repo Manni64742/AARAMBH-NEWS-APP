@@ -124,6 +124,9 @@ export interface ReporterProfile {
   idProofType?: string
   idProofNumber?: string
   idProofDocumentUrl?: string
+  kycStatus?: 'NOT_SUBMITTED' | 'SUBMITTED' | 'VERIFIED' | 'REJECTED'
+  kycRequired?: boolean
+  profilePhotoUrl?: string
   assignedLocations?: LocationItem[]
   assignedCategories?: CategoryItem[]
   isAutoPublishAllowed: boolean

@@ -11,6 +11,7 @@ import { useTheme } from '../context/ThemeContext'
 import { ScaledText as Text } from '../components/ScaledText'
 import { AtmosphereBackground } from '../components/AtmosphereBackground'
 import { AarambhLoader } from '../components/AarambhLoader'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const POPULAR_CITIES: Array<{ name: string; state: string }> = [
   { name: 'Mumbai', state: 'Maharashtra' },
@@ -39,6 +40,7 @@ const ICONS = ['business-outline', 'flag-outline', 'compass-outline', 'home-outl
 
 export default function LocationPickerScreen({ navigation }: any) {
   const { colors: themeColors } = useTheme()
+  const insets = useSafeAreaInsets()
   const { detect, setManual, current } = useLocation()
   const { user } = useAuth()
   const { success } = useToast()
@@ -152,7 +154,7 @@ export default function LocationPickerScreen({ navigation }: any) {
         </View>
       </ScrollView>
 
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { paddingBottom: 12 + insets.bottom }]}>
         <Pressable style={[styles.saveBtn, { backgroundColor: themeColors.primary, opacity: selectedCount ? 1 : 0.45 }]} disabled={!selectedCount} onPress={() => setOverlayMode('listing')}>
           <Text style={styles.saveBtnText}>Next ({selectedCount} selected)</Text>
           <Ionicons name="arrow-forward" size={18} color="#fff" />
@@ -216,7 +218,7 @@ const styles = StyleSheet.create({
   heading: { fontFamily: fonts.sans[700], fontSize: 22, textAlign: 'center' },
   subHeading: { fontSize: 13, textAlign: 'center', marginTop: 6, lineHeight: 19, paddingHorizontal: 24 },
   header: { paddingTop: 24, paddingHorizontal: 16, backgroundColor: colors.bg },
-  gridScroll: { paddingTop: 20, paddingBottom: 150, alignItems: 'center' },
+  gridScroll: { paddingTop: 20, paddingBottom: 100, alignItems: 'center' },
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: 10, paddingHorizontal: 16, maxWidth: 420 },
   popularChip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 24, paddingHorizontal: 14, paddingVertical: 10 },
   popularChipActive: { borderColor: colors.primary },

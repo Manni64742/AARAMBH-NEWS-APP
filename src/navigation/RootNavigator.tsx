@@ -48,6 +48,7 @@ import LanguageSettingsScreen from '../screens/LanguageSettingsScreen'
 import { useLanguage } from '../context/LanguageContext'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { withReporterGate } from '../components/reporter/ReporterGate'
+import * as Notifications from 'expo-notifications'
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
 const Tab = createBottomTabNavigator<MainTabParamList>()
@@ -244,7 +245,17 @@ export default function RootNavigator() {
 
   return (
     <ErrorBoundary>
-      <NavigationContainer ref={navigationRef}>
+      <NavigationContainer
+        ref={navigationRef}
+        onReady={() => {
+          Notifications.getLastNotificationResponseAsync()
+            .then((response) => {
+              const contentId = response?.notification?.request?.content?.data?.contentId
+              if (contentId) navigateToNewsDetail(String(contentId))
+            })
+            .catch(() => {})
+        }}
+      >
         <Stack.Navigator
           initialRouteName={isLanguageSelected ? 'Main' : 'LanguageSelect'}
           screenOptions={{

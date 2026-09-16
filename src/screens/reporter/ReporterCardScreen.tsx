@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Image, ScrollView, StyleSheet, View } from 'react-native'
+import { ScrollView, StyleSheet, View } from 'react-native'
+import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { ScaledText as Text } from '../../components/ScaledText'
 import { reporterApi } from '../../api/endpoints'
@@ -27,7 +28,7 @@ export default function ReporterCardScreen() {
   if (error) return <ErrorState message={error} onRetry={() => setError(null)} />
 
   const user = card?.userId as any
-  const avatarUri = user?.avatar ? mediaUrl(user.avatar) : undefined
+  const avatarUri = (card?.profilePhotoUrl || user?.avatar) ? mediaUrl(card?.profilePhotoUrl || user?.avatar) : undefined
   const designation = (card?.badge || 'LOCAL STRINGER').replace(/_/g, ' ')
   const isApproved = card?.approvalStatus === 'APPROVED'
 
@@ -70,7 +71,7 @@ export default function ReporterCardScreen() {
         <View style={styles.cardBody}>
           <View style={styles.photoContainer}>
             {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.photo} />
+              <Image source={{ uri: avatarUri }} style={styles.photo} contentFit="cover" contentPosition="center" transition={150} />
             ) : (
               <View style={[styles.photoFallback, { backgroundColor: colors.primary }]}>
                 <Text style={styles.photoFallbackText}>{(user?.name || 'R').charAt(0).toUpperCase()}</Text>

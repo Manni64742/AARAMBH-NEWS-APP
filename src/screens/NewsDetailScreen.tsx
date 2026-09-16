@@ -347,11 +347,16 @@ export default function NewsDetailScreen() {
     }
   }
 
+  const ytVideoId = item ? (item.youtubeId || (item.youtubeUrl ? videoIdFromUrl(item.youtubeUrl) : null)) : null
+  const image = item ? mediaUrl(item.featuredImage?.url) : null
+  const videoSrc = item ? mediaUrl(item.shortVideoPayload?.videoUrl || item.videoPayload?.videoUrl) : null
+  const videoPlayer = useVideoPlayer(item && videoSrc ? (videoSrc as any) : null)
+
+  const insets = useSafeAreaInsets()
+  const topInset = insets.top
+  const headerTotalHeight = topInset + 48
+
   if (!item) return null
-  const ytVideoId = item.youtubeId || (item.youtubeUrl ? videoIdFromUrl(item.youtubeUrl) : null)
-  const image = mediaUrl(item.featuredImage?.url)
-  const videoSrc = mediaUrl(item.shortVideoPayload?.videoUrl || item.videoPayload?.videoUrl)
-  const videoPlayer = useVideoPlayer(videoSrc ? (videoSrc as any) : null)
 
   const captionText =
     item.imageCaption ||
@@ -359,10 +364,6 @@ export default function NewsDetailScreen() {
     item.featuredImage?.alt ||
     (item.featuredImage?.credit ? `फ़ोटो: ${item.featuredImage.credit}` : null) ||
     `${item.title} · (फ़ोटो: Aarambh News Archive / PTI)`
-
-  const insets = useSafeAreaInsets()
-  const topInset = insets.top
-  const headerTotalHeight = topInset + 48
 
   return (
     <View style={[styles.safe, { backgroundColor: themeColors.background }]}>
@@ -373,7 +374,7 @@ export default function NewsDetailScreen() {
       >
 
         {related.length > 0 ? <View style={[styles.focusStrip, { backgroundColor: themeColors.surfaceContainer, borderBottomColor: themeColors.border }]}>
-          <View style={styles.focusLabel}><Text style={[styles.focusLabelText, { color: themeColors.primary }]}>INFO</Text></View>
+          <View style={styles.focusLabel}><Text numberOfLines={1} style={[styles.focusLabelText, { color: themeColors.primary }]}>INFO</Text></View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.focusCards}>
             {related.slice(0, 6).map((story) => {
               const storyImage = mediaUrl(story.featuredImage?.url)
@@ -668,8 +669,8 @@ const styles = StyleSheet.create({
   choiceRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, marginHorizontal: 5, borderRadius: 7 },
   choiceText: { fontFamily: fonts.inter[500], fontSize: 13 },
   focusStrip: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, paddingVertical: 4 },
-  focusLabel: { width: 32, alignItems: 'center', justifyContent: 'center' },
-  focusLabelText: { fontFamily: fonts.inter[700], fontSize: 11, letterSpacing: 0.7, textAlign: 'center', transform: [{ rotate: '-90deg' }] },
+  focusLabel: { width: 44, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  focusLabelText: { fontFamily: fonts.inter[700], fontSize: 11, letterSpacing: 0.4, textAlign: 'center', transform: [{ rotate: '-90deg' }] },
   focusCards: { gap: 7, paddingHorizontal: 3 },
   focusCard: { height: 76, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth },
   focusTitle: { flex: 1, fontFamily: fonts.sans[400], fontSize: 12, fontWeight: '400', lineHeight: 15 },

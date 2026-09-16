@@ -76,8 +76,7 @@ export default function ReporterDashboardScreen({ navigation }: any) {
       label: 'Pending',
       value: stats?.pending ?? 0,
       icon: 'time-outline' as const,
-      color: '#D97706',
-      bgLight: 'rgba(217, 119, 6, 0.08)',
+      color: colors.primary,
       statusFilter: 'PENDING_REVIEW',
     },
     {
@@ -85,8 +84,7 @@ export default function ReporterDashboardScreen({ navigation }: any) {
       label: 'Published',
       value: stats?.published ?? 0,
       icon: 'checkmark-done-circle-outline' as const,
-      color: '#10B981',
-      bgLight: 'rgba(16, 185, 129, 0.08)',
+      color: colors.success,
       statusFilter: 'PUBLISHED',
     },
     {
@@ -94,8 +92,7 @@ export default function ReporterDashboardScreen({ navigation }: any) {
       label: 'Drafts',
       value: stats?.drafts ?? (stats?.total ? Math.max(0, (stats.total || 0) - ((stats.pending || 0) + (stats.published || 0) + (stats.rejected || 0))) : 0),
       icon: 'document-text-outline' as const,
-      color: '#3B82F6',
-      bgLight: 'rgba(59, 130, 246, 0.08)',
+      color: colors.highlightBlueLight,
       statusFilter: 'DRAFT',
     },
     {
@@ -103,8 +100,7 @@ export default function ReporterDashboardScreen({ navigation }: any) {
       label: 'Total Views',
       value: (stats?.totalViews || 0).toLocaleString(),
       icon: 'eye-outline' as const,
-      color: colors.primary,
-      bgLight: colors.primarySoft,
+      color: colors.highlightBlueLight,
       statusFilter: null,
     },
     {
@@ -112,17 +108,15 @@ export default function ReporterDashboardScreen({ navigation }: any) {
       label: 'Reader Likes',
       value: (stats?.totalLikes || 0).toLocaleString(),
       icon: 'heart-outline' as const,
-      color: '#EC4899',
-      bgLight: 'rgba(236, 72, 153, 0.08)',
+      color: colors.primary,
       statusFilter: null,
     },
     {
       id: 'rejected',
-      label: 'Needs Edits',
+      label: 'News Edits',
       value: stats?.rejected ?? 0,
-      icon: 'alert-circle-outline' as const,
-      color: '#EF4444',
-      bgLight: 'rgba(239, 68, 68, 0.08)',
+      icon: 'create-outline' as const,
+      color: colors.success,
       statusFilter: 'REJECTED',
     },
   ]
@@ -200,9 +194,7 @@ export default function ReporterDashboardScreen({ navigation }: any) {
             onPress={() => handleMetricPress(m.statusFilter)}
             disabled={!m.statusFilter}
           >
-            <View style={[styles.iconCircle, { backgroundColor: m.bgLight }]}>
-              <Ionicons name={m.icon} size={18} color={m.color} />
-            </View>
+            <Ionicons name={m.icon} size={16} color={m.color} style={styles.metricIcon} />
             <Text style={[styles.metricValue, { color: colors.text }]}>{m.value}</Text>
             <Text style={[styles.metricLabel, { color: colors.textMuted }]} numberOfLines={1}>
               {m.label}
@@ -571,13 +563,14 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   metricCard: {
     width: '31.3%',
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    padding: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     alignItems: 'center',
     position: 'relative',
   },
@@ -587,28 +580,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 3,
   },
-  iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
+  metricIcon: {
+    marginBottom: 4,
   },
   metricValue: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '900',
   },
   metricLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 2,
+    fontSize: 9.5,
+    fontWeight: '700',
+    marginTop: 1,
     textAlign: 'center',
   },
   clickHint: {
     position: 'absolute',
-    top: 6,
-    right: 6,
+    top: 4,
+    right: 4,
   },
   emptyCard: {
     padding: 28,

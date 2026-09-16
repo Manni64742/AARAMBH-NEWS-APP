@@ -50,6 +50,11 @@ export default function MySubmissionsScreen({ navigation, route }: any) {
 
   return (
     <View style={[styles.safe, { backgroundColor: colors.background }]}>
+      {/* Compact intro so reporters understand what this section is for */}
+      <Text style={[styles.sectionDescription, { color: colors.textMuted }]}>
+        View and manage all your submitted stories — drafts, pending reviews, published and rejected reports.
+      </Text>
+
       {/* Fixed Clean Top Status Tabs */}
       <View style={[styles.filterBarContainer, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <ScrollView
@@ -138,7 +143,13 @@ export default function MySubmissionsScreen({ navigation, route }: any) {
             <View style={styles.cardBottomRow}>
               <Text style={[styles.itemMeta, { color: colors.textMuted }]}>
                 {new Date(item.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                {item.metrics?.views ? ` · 👁 ${item.metrics.views}` : ''}
+                {item.metrics?.views ? (
+                  <>
+                    {' · '}
+                    <Ionicons name="eye-outline" size={12} color={colors.highlightBlueLight} />
+                    {` ${item.metrics.views}`}
+                  </>
+                ) : null}
               </Text>
 
               {item.status === 'DRAFT' || item.status === 'PENDING_REVIEW' || item.status === 'REJECTED' ? (
@@ -187,6 +198,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 8,
     alignItems: 'center',
+  },
+  sectionDescription: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 4,
+    fontSize: 12.5,
+    lineHeight: 18,
   },
   filterTab: {
     paddingHorizontal: 16,

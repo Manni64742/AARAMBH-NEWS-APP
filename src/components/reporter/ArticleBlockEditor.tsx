@@ -343,6 +343,9 @@ export default function ArticleBlockEditor({
                     >
                       <Ionicons name={b.icon} size={14} color={colors.primary} />
                       <Text style={[styles.toolBtnText, { color: colors.text }]}>{b.label}</Text>
+                      <View style={[styles.toolBtnAdd, { backgroundColor: colors.primary }]}>
+                        <Ionicons name="add" size={11} color="#fff" />
+                      </View>
                     </Pressable>
                   ))}
                 </View>
@@ -384,6 +387,9 @@ export default function ArticleBlockEditor({
             >
               <Ionicons name={b.icon} size={14} color="#2563EB" />
               <Text style={[styles.toolBtnText, { color: isDark ? '#E2E8F0' : '#1E40AF' }]}>{b.label}</Text>
+              <View style={[styles.toolBtnAdd, { backgroundColor: '#2563EB' }]}>
+                <Ionicons name="add" size={11} color="#fff" />
+              </View>
             </Pressable>
           ))}
         </View>
@@ -569,8 +575,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    paddingVertical: 6,
-    marginTop: 4,
+    paddingVertical: 4,
+    marginTop: 2,
   },
   insertBetweenText: {
     fontSize: 11.5,
@@ -613,16 +619,16 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   toolboxCard: {
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    padding: 12,
-    marginTop: 6,
+    padding: 10,
+    marginTop: 4,
   },
   toolboxTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   toolboxDot: {
     width: 7,
@@ -630,8 +636,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   toolboxTitle: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '800',
+    letterSpacing: 0.4,
   },
   toolboxButtons: {
     flexDirection: 'row',
@@ -641,15 +648,25 @@ const styles = StyleSheet.create({
   toolBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 11,
+    justifyContent: 'center',
+    gap: 4,
     paddingVertical: 7,
-    borderRadius: 16,
+    paddingHorizontal: 12,
+    borderRadius: 14,
     borderWidth: 1,
   },
   toolBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '400',
+    letterSpacing: 0.2,
+    textTransform: 'uppercase',
+  },
+  toolBtnAdd: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingBottom: 24, maxHeight: 460 },

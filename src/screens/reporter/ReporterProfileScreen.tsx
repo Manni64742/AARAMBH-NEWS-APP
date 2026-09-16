@@ -139,7 +139,7 @@ export default function ReporterProfileScreen({ navigation }: any) {
   const isApproved = profile.approvalStatus === 'APPROVED'
   const isPending = profile.approvalStatus === 'PENDING'
   const isRejected = profile.approvalStatus === 'REJECTED'
-  const avatarUri = user?.avatar ? mediaUrl(user.avatar) : undefined
+  const avatarUri = (profile.profilePhotoUrl || user?.avatar) ? mediaUrl(profile.profilePhotoUrl || user?.avatar) : undefined
   const designation = (profile.badge || 'LOCAL STRINGER').replace(/_/g, ' ')
 
   return (

@@ -7,6 +7,7 @@ import { CategoryItem, ContentItem, MarketIndexItem } from '../types'
 import { colors, fonts, spacing } from '../theme'
 import { CategoryChip, NewsCard, SectionHeader } from '../components/NewsCard'
 import MarketTicker from '../components/MarketTicker'
+import { AdBanner } from '../components/AdBanner'
 import { EmptyState, ErrorState, SkeletonCard } from '../components/States'
 import { ScaledText as Text } from '../components/ScaledText'
 import { AarambhLoader } from '../components/AarambhLoader'
@@ -275,6 +276,7 @@ export default function FeedScreen({ navigation }: any) {
             subtitle={language === 'hi' ? 'कृपया दूसरी श्रेणी चुनें' : 'Try selecting another category'}
           />
         }
+        ListFooterComponent={groupedSections.length > 0 ? <AdBanner slot="feed_bottom" /> : null}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: headerPaddingTop, paddingBottom: 70 }}
         scrollIndicatorInsets={{ top: headerPaddingTop }}

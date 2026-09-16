@@ -1,12 +1,14 @@
 import React, { useCallback } from 'react'
-import { FlatList, RefreshControl, StyleSheet } from 'react-native'
+import { FlatList, RefreshControl } from 'react-native'
 import { interactionApi } from '../api/endpoints'
 import { colors } from '../theme'
+import { useTheme } from '../context/ThemeContext'
 import { NewsCard } from '../components/NewsCard'
 import { EmptyState, ErrorState, SkeletonCard } from '../components/States'
 import { usePagedFeed } from '../hooks/usePagedFeed'
 
 export default function FavoritesScreen({ navigation }: any) {
+  const { colors: themeColors } = useTheme()
   const load = useCallback(async (page: number) => {
     const res = await interactionApi.list('FAVORITE', page, 20)
     return { data: res.data, pagination: res.pagination }
@@ -15,7 +17,7 @@ export default function FavoritesScreen({ navigation }: any) {
 
   return (
     <FlatList
-      style={{ backgroundColor: colors.bg }}
+      style={{ backgroundColor: themeColors.background }}
       data={feed.items}
       keyExtractor={(item) => item._id}
       renderItem={({ item }) => <NewsCard item={item} onPress={() => navigation.push('NewsDetail', { item })} />}

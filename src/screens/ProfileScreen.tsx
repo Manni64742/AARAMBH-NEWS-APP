@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import Slider from '@react-native-community/slider'
+import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../context/AuthContext'
@@ -9,6 +10,7 @@ import { interactionApi, notificationApi, reporterApi, userApi } from '../api/en
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
 import { colors, fonts, fontFor } from '../theme'
+import { mediaUrl } from '../config'
 import { ScaledText as Text } from '../components/ScaledText'
 
 export default function ProfileScreen({ navigation }: any) {
@@ -19,6 +21,7 @@ export default function ProfileScreen({ navigation }: any) {
   const insets = useSafeAreaInsets()
   const [activity, setActivity] = useState({ read: 0, bookmarks: 0, favorites: 0, likes: 0, views: 0, notifications: 0 })
   const [reporterStats, setReporterStats] = useState<any>(null)
+  const [reporterProfile, setReporterProfile] = useState<any>(null)
 
   useEffect(() => {
     if (!user) return
@@ -30,7 +33,8 @@ export default function ProfileScreen({ navigation }: any) {
       interactionApi.list('VIEW', 1, 1),
       notificationApi.list(1, 1),
       isReporter ? reporterApi.stats() : Promise.resolve(null),
-    ]).then(([history, bookmarks, favorites, likes, views, notifications, stats]) => {
+      isReporter ? reporterApi.profile().catch(() => null) : Promise.resolve(null),
+    ]).then(([history, bookmarks, favorites, likes, views, notifications, stats, rp]) => {
       setActivity({
         read: history.pagination?.total || 0,
         bookmarks: bookmarks.pagination?.total || 0,
@@ -40,6 +44,7 @@ export default function ProfileScreen({ navigation }: any) {
         notifications: notifications.pagination?.unread || 0,
       })
       setReporterStats(stats)
+      setReporterProfile(rp)
     }).catch(() => {})
   }, [user, isReporter])
 
@@ -137,21 +142,72 @@ export default function ProfileScreen({ navigation }: any) {
     { icon: 'card-outline', label: 'My Press Card', route: 'ReporterCard' },
   ]
 
+  const reporterUser = (reporterProfile?.userId as any) || user
+  const reporterPhoto = reporterProfile?.profilePhotoUrl || reporterUser?.avatar || user?.avatar || ''
+  const reporterDesignation = reporterProfile?.badge ? reporterProfile.badge.replace(/_/g, ' ') : ''
+  const reporterVerified = reporterProfile?.approvalStatus === 'APPROVED'
+  const reporterPending = reporterProfile?.approvalStatus === 'PENDING'
+  const reporterBadgeColor = reporterVerified ? '#00A859' : reporterPending ? '#F59E0B' : '#64748B'
+
   return (
     <View style={[styles.safe, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: 60 }}>
         <View style={[styles.headerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.headerCenter}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{(user?.name || 'U').charAt(0)}</Text>
+            <View style={[styles.avatar, reporterPhoto && styles.avatarImgWrap]}>
+              {reporterPhoto ? (
+                <Image source={{ uri: mediaUrl(reporterPhoto) }} style={styles.avatarImg} contentFit="cover" />
+              ) : (
+                <Text style={styles.avatarText}>{(user?.name || 'U').charAt(0)}</Text>
+              )}
             </View>
-            <Text style={[styles.name, { fontFamily: fontFor(user?.name, 700) }]}>{user?.name}</Text>
-            <Text style={styles.detail}>{user?.email || user?.phone || 'Member'}</Text>
-            <View style={styles.roleRow}>
-              <View style={[styles.roleBadge, isReporter && styles.roleReporter]}>
-                <Text style={[styles.roleText, isReporter && styles.roleTextReporter]}>{user?.role || 'USER'}</Text>
-              </View>
-            </View>
+            <Text style={[styles.name, { fontFamily: fontFor(user?.name, 700), color: colors.text }]}>{user?.name}</Text>
+
+            {isReporter && reporterProfile ? (
+              <>
+                <View style={styles.badgeRow}>
+                  <View style={[styles.verifiedBadge, { backgroundColor: `${reporterBadgeColor}1F`, borderColor: `${reporterBadgeColor}50` }]}>
+                    <Ionicons name={reporterVerified ? 'checkmark-circle' : reporterPending ? 'time' : 'shield-outline'} size={12} color={reporterBadgeColor} />
+                    <Text style={[styles.verifiedBadgeText, { color: reporterBadgeColor }]}>
+                      {reporterVerified
+                        ? 'VERIFIED REPORTER'
+                        : reporterPending
+                        ? 'REPORTER · PENDING REVIEW'
+                        : 'REPORTER'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.profileLine}>
+                  <Ionicons name="mail-outline" size={14} color={colors.primary} />
+                  <Text style={[styles.profileLineText, { color: colors.textMuted }]} numberOfLines={1}>
+                    {user?.email || user?.phone || 'N/A'}
+                  </Text>
+                </View>
+
+                <View style={styles.profileLine}>
+                  <Ionicons name="id-card-outline" size={14} color={colors.primary} />
+                  <Text style={[styles.profileLineText, { color: colors.textMuted }]} numberOfLines={1}>
+                    {reporterProfile.reporterId}
+                  </Text>
+                </View>
+
+                <View style={[styles.designationChip, { backgroundColor: colors.surfaceContainer, borderColor: colors.border }]}>
+                  <Text style={[styles.designationChipText, { color: colors.textMuted }]}>
+                    {reporterDesignation || 'LOCAL STRINGER'}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.detail, { color: colors.textMuted }]}>{user?.email || user?.phone || 'Member'}</Text>
+                <View style={styles.roleRow}>
+                  <View style={[styles.roleBadge, isReporter && styles.roleReporter]}>
+                    <Text style={[styles.roleText, isReporter && styles.roleTextReporter]}>{user?.role || 'USER'}</Text>
+                  </View>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
@@ -170,20 +226,35 @@ export default function ProfileScreen({ navigation }: any) {
           <Pressable style={styles.menuRow} onPress={() => navigation.navigate('Notifications')}><Ionicons name="notifications-outline" size={20} color={colors.primary} /><Text style={[styles.menuText, { color: colors.text }]}>Notifications</Text><Text style={[styles.count, { color: colors.textMuted }]}>{activity.notifications}</Text><Ionicons name="chevron-forward" size={18} color={colors.textLight} /></Pressable>
         </View>
 
+        <Text style={[styles.section, { color: colors.textMuted }]}>LOCATION</Text>
         <Pressable style={[styles.locationCard, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => navigation.navigate('LocationPicker')}>
           <Ionicons name="location" size={18} color={colors.primary} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.locationLabel}>Your location</Text>
-            <Text style={styles.locationValue}>{location?.label || 'Not set — tap to select'}</Text>
+            <Text style={[styles.locationLabel, { color: colors.textMuted }]}>Your location</Text>
+            <Text style={[styles.locationValue, { color: colors.text }]}>{location?.label || 'All India'}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
         </Pressable>
+        <View style={{ height: 10 }} />
 
         {isReporter ? (
           <>
-            <Text style={styles.section}>Reporter Tools</Text>
+            <Text style={[styles.section, { color: colors.textMuted }]}>Reporter Tools</Text>
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.reporterStats}><Text style={styles.reporterStatsText}>Articles {reporterStats?.total ?? 0}</Text><Text style={styles.reporterStatsText}>Pending {reporterStats?.pending ?? 0}</Text><Text style={styles.reporterStatsText}>Published {reporterStats?.published ?? 0}</Text></View>
+              <View style={[styles.reporterStatsRow, { borderBottomColor: colors.border }]}>
+                <View style={styles.reporterStat}>
+                  <Text style={[styles.reporterStatValue, { color: colors.highlightBlueLight }]}>{reporterStats?.total ?? 0}</Text>
+                  <Text style={[styles.reporterStatLabel, { color: colors.textMuted }]}>Articles</Text>
+                </View>
+                <View style={styles.reporterStat}>
+                  <Text style={[styles.reporterStatValue, { color: colors.highlightBlueLight }]}>{reporterStats?.pending ?? 0}</Text>
+                  <Text style={[styles.reporterStatLabel, { color: colors.textMuted }]}>Pending</Text>
+                </View>
+                <View style={styles.reporterStat}>
+                  <Text style={[styles.reporterStatValue, { color: colors.highlightBlueLight }]}>{reporterStats?.published ?? 0}</Text>
+                  <Text style={[styles.reporterStatLabel, { color: colors.textMuted }]}>Published</Text>
+                </View>
+              </View>
               {reporterMenu.map((m) => (
                 <Pressable key={m.label} style={styles.menuRow} onPress={() => navigation.navigate(m.route)}>
                   <Ionicons name={m.icon} size={20} color={colors.primary} />
@@ -238,10 +309,19 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   headerCard: { alignItems: 'center', padding: 20, marginHorizontal: 16, marginTop: 12, borderRadius: 16, borderWidth: 1 },
   headerCenter: { alignItems: 'center' },
-  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontSize: 28, fontWeight: '900' },
-  name: { fontFamily: fonts.serif[700], fontSize: 20, color: colors.text, textAlign: 'center', marginTop: 10 },
-  detail: { fontSize: 13, color: colors.textMuted, marginTop: 2, textAlign: 'center' },
+  avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontSize: 30, fontWeight: '900' },
+  avatarImgWrap: { overflow: 'hidden' },
+  avatarImg: { width: '100%', height: '100%' },
+  badgeRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 10 },
+  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 4 },
+  verifiedBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  profileLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 7 },
+  profileLineText: { fontSize: 13, fontWeight: '500' },
+  designationChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 4, marginTop: 10 },
+  designationChipText: { fontSize: 10.5, fontWeight: '700', letterSpacing: 0.5 },
+  name: { fontFamily: fonts.serif[700], fontSize: 22, textAlign: 'center', marginTop: 12 },
+  detail: { fontSize: 13, marginTop: 3, textAlign: 'center' },
   roleRow: { flexDirection: 'row', marginTop: 6, justifyContent: 'center' },
   roleBadge: { backgroundColor: colors.surfaceContainer, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   roleReporter: { backgroundColor: colors.primarySoft },
@@ -250,7 +330,7 @@ const styles = StyleSheet.create({
   locationCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 14 },
   locationLabel: { fontSize: 11, color: colors.textLight, textTransform: 'uppercase', fontWeight: '700' },
   locationValue: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 2 },
-  section: { fontSize: 13, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginHorizontal: 16, marginTop: 20, marginBottom: 8 },
+  section: { fontSize: 13, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginHorizontal: 16, marginTop: 22, marginBottom: 10 },
   card: { marginHorizontal: 16, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   activityCard: { flexDirection: 'row', justifyContent: 'space-around', marginHorizontal: 16, borderRadius: 14, borderWidth: 1, paddingVertical: 16 },
   activityValue: { fontSize: 18, fontWeight: '800', textAlign: 'center' },
@@ -264,8 +344,10 @@ const styles = StyleSheet.create({
   sliderLabel: { color: colors.textMuted, fontSize: 11 },
   modeValue: { color: colors.textMuted, fontWeight: '700' },
   count: { color: colors.textMuted, fontSize: 12, fontWeight: '700', marginRight: 2 },
-  reporterStats: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 12 },
-  reporterStatsText: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
+  reporterStatsRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  reporterStat: { alignItems: 'center', gap: 2 },
+  reporterStatValue: { fontSize: 16, fontWeight: '800' },
+  reporterStatLabel: { fontSize: 10.5, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 24, marginHorizontal: 16, paddingVertical: 13, borderRadius: 12, backgroundColor: colors.primarySoft, borderWidth: 1, borderColor: colors.primarySoftBorder },
   logoutText: { color: colors.danger, fontSize: 14, fontWeight: '800' },
   footerText: { textAlign: 'center', color: colors.textLight, fontSize: 12, marginTop: 16 },

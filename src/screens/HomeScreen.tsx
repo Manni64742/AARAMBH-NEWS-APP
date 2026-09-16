@@ -759,13 +759,6 @@ export default function HomeScreen({ navigation }: any) {
               </View>
             </View>
           ) : null}
-
-          {/* SECTION: LATEST HEADLINES HEADER (ताज़ा सुर्खियां) */}
-          <View style={[styles.thematicSectionHeader, { marginTop: 20, marginBottom: 4 }]}>
-            <Text style={[styles.thematicSectionHeading, { color: themeColors.text }]}>
-              {language === 'hi' ? 'ताज़ा सुर्खियां' : 'Latest Headlines'}
-            </Text>
-          </View>
         </View>
       ) : (
         /* ── IF A SPECIFIC CATEGORY IS ACTIVE: RENDER CATEGORY FILTER & SLIDER ── */
@@ -884,13 +877,22 @@ export default function HomeScreen({ navigation }: any) {
   )
 
   /* ────── Footer ────── */
-  const ListFooter = feed.loadingMore ? (
-    <AarambhLoader size="sm" style={{ paddingVertical: 14 }} />
-  ) : !feed.pagination?.hasNextPage && feed.items.length > 0 ? (
-    <Text style={[styles.endText, { color: themeColors.secondary }]}>
-      {language === 'hi' ? 'आपने सभी खबरें देख ली हैं' : "You've reached the end"}
-    </Text>
-  ) : null
+  const ListFooter = (
+    <View>
+      {feed.items.length > 0 ? (
+        <View style={styles.adSlotWrap}>
+          <AdBanner slot="home_bottom" />
+        </View>
+      ) : null}
+      {feed.loadingMore ? (
+        <AarambhLoader size="sm" style={{ paddingVertical: 14 }} />
+      ) : !feed.pagination?.hasNextPage && feed.items.length > 0 ? (
+        <Text style={[styles.endText, { color: themeColors.secondary }]}>
+          {language === 'hi' ? 'आपने सभी खबरें देख ली हैं' : "You've reached the end"}
+        </Text>
+      ) : null}
+    </View>
+  )
 
   /* ────── Render ────── */
   return (
