@@ -254,7 +254,8 @@ export interface MarketIndexItem {
 export interface ActiveAdvertisementItem {
   _id: string
   title: string
-  placement: string
+  placement?: string
+  placements?: string[]
   script?: string
   targetUrl?: string
   imageUrl?: string

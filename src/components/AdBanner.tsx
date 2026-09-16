@@ -186,7 +186,7 @@ function ScriptAdRenderer({
     >
       <View style={[styles.adLabelWrap, { borderBottomColor: themeColors.border }]}>
         <Text style={[styles.adLabel, { color: themeColors.textMuted }]}>
-          SPONSORED · {ad.placement.toUpperCase()}
+          SPONSORED · {((ad.placements && ad.placements[0]) || ad.placement || 'ADVERTISEMENT').toUpperCase()}
         </Text>
       </View>
       <WebView
@@ -232,7 +232,7 @@ function ImageAdRenderer({
     >
       <View style={[styles.adLabelWrap, { borderBottomColor: themeColors.border }]}>
         <Text style={[styles.adLabel, { color: themeColors.textMuted }]}>
-          SPONSORED · {ad.placement.toUpperCase()}
+          SPONSORED · {((ad.placements && ad.placements[0]) || ad.placement || 'ADVERTISEMENT').toUpperCase()}
         </Text>
       </View>
       <View style={styles.imageAdWrap}>
