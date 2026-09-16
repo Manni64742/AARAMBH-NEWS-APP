@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -7,6 +8,7 @@ import {
   Pressable,
   ScrollView,
   Share,
+  StatusBar,
   StyleSheet,
   Text as NativeText,
   TextInput,
@@ -271,6 +273,33 @@ export default function NewsDetailScreen() {
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
   const [captionVisible, setCaptionVisible] = useState(false)
   const captionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false)
+  const commentScrollRef = useRef<ScrollView>(null)
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+
+    const onShow = (e: any) => {
+      const h = e?.endCoordinates?.height || 0
+      setKeyboardHeight(h)
+      setIsKeyboardVisible(true)
+    }
+
+    const onHide = () => {
+      setKeyboardHeight(0)
+      setIsKeyboardVisible(false)
+    }
+
+    const showSub = Keyboard.addListener(showEvent, onShow)
+    const hideSub = Keyboard.addListener(hideEvent, onHide)
+
+    return () => {
+      showSub.remove()
+      hideSub.remove()
+    }
+  }, [])
 
   const toggleCaption = useCallback(() => {
     setCaptionVisible((prev) => {
@@ -431,6 +460,15 @@ export default function NewsDetailScreen() {
   const insets = useSafeAreaInsets()
   const topInset = insets.top
   const headerTotalHeight = topInset + 48
+
+  const statusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0
+  const availableHeightAboveKeyboard = screenHeight - keyboardHeight - insets.top - statusBarHeight - 16
+  const maxSheetHeight = isKeyboardVisible
+    ? Math.max(Math.min(availableHeightAboveKeyboard, 520), 240)
+    : Math.min(screenHeight * 0.75, 620)
+  const sheetBottomPadding = isKeyboardVisible
+    ? (Platform.OS === 'ios' ? 8 : 6)
+    : Math.max(insets.bottom, 12)
 
   if (!item) return null
 
@@ -806,15 +844,24 @@ export default function NewsDetailScreen() {
         visible={commentSheetVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setCommentSheetVisible(false)}
+        statusBarTranslucent={true}
+        onRequestClose={() => {
+          Keyboard.dismiss()
+          setCommentSheetVisible(false)
+        }}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+          keyboardVerticalOffset={0}
           style={styles.commentModalOverlay}
         >
           <Pressable
             style={styles.commentModalBackdrop}
-            onPress={() => setCommentSheetVisible(false)}
+            onPress={() => {
+              Keyboard.dismiss()
+              setCommentSheetVisible(false)
+            }}
+            accessibilityLabel="Dismiss comments sheet"
           />
           <View
             style={[
@@ -822,8 +869,8 @@ export default function NewsDetailScreen() {
               {
                 backgroundColor: themeColors.card,
                 borderTopColor: themeColors.border,
-                paddingBottom: Math.max(insets.bottom, 12),
-                maxHeight: Math.min(screenHeight * 0.75, 620),
+                paddingBottom: sheetBottomPadding,
+                maxHeight: maxSheetHeight,
               },
             ]}
           >
@@ -845,7 +892,10 @@ export default function NewsDetailScreen() {
               </View>
               <Pressable
                 style={styles.commentSheetCloseBtn}
-                onPress={() => setCommentSheetVisible(false)}
+                onPress={() => {
+                  Keyboard.dismiss()
+                  setCommentSheetVisible(false)
+                }}
                 hitSlop={10}
                 accessibilityLabel="Close comments"
               >
@@ -855,9 +905,11 @@ export default function NewsDetailScreen() {
 
             {/* Comments List */}
             <ScrollView
+              ref={commentScrollRef}
               style={styles.commentListScroll}
               contentContainerStyle={styles.commentListContent}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
               showsVerticalScrollIndicator={true}
             >
               {comments.length === 0 ? (
@@ -895,7 +947,7 @@ export default function NewsDetailScreen() {
             </ScrollView>
 
             {/* Fixed Comment Input at Bottom of Sheet */}
-            <View style={[styles.sheetInputBar, { borderTopColor: themeColors.border, backgroundColor: themeColors.card }]}>
+            <View style={[styles.sheetInputBar, { borderTopColor: themeColors.border, backgroundColor: themeColors.card, paddingBottom: isKeyboardVisible ? 6 : 10 }]}>
               <TextInput
                 style={[
                   styles.sheetTextInput,
