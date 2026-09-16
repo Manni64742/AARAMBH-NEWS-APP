@@ -235,9 +235,8 @@ function BlockView({ block }: { block: ArticleBlock }) {
   }
   if (block.type === 'ADVERTISEMENT')
     return (
-      <View style={[styles.embed, { backgroundColor: colors.surfaceVariant, borderColor: colors.border }]}>
-        <Ionicons name="megaphone-outline" size={16} color={colors.textMuted} />
-        <Text style={[styles.embedText, { color: colors.textMuted }]}>{block.caption || (block.adSlot ? `Advertisement · ${block.adSlot}` : 'Advertisement')}</Text>
+      <View style={{ marginVertical: 8 }}>
+        <AdBanner slot={block.adSlot || 'article_middle'} />
       </View>
     )
   if (block.type === 'RELATED_STORY')
@@ -629,6 +628,11 @@ export default function NewsDetailScreen() {
               </Text>
             </View>
           ) : null}
+
+          {/* Top Article Ad Placement */}
+          <View style={{ marginVertical: 6 }}>
+            <AdBanner slot="article_top" />
+          </View>
 
           {(item.bodyBlocks || []).map((block) => (
             <BlockView key={block.id} block={block} />

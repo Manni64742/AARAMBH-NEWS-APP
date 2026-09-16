@@ -939,12 +939,19 @@ export default function HomeScreen({ navigation }: any) {
       <FlatList
         data={feedWithoutHero}
         keyExtractor={(item) => item._id || (item as any).id}
-        renderItem={({ item }) => (
-          <NewsCard
-            item={item}
-            onPress={() => openNews(item)}
-            onBookmark={() => handleBookmark(item._id)}
-          />
+        renderItem={({ item, index }) => (
+          <View>
+            <NewsCard
+              item={item}
+              onPress={() => openNews(item)}
+              onBookmark={() => handleBookmark(item._id)}
+            />
+            {index === 3 ? (
+              <View style={styles.adSlotWrap}>
+                <AdBanner slot="home_middle" />
+              </View>
+            ) : null}
+          </View>
         )}
         ListHeaderComponent={Header}
         ListEmptyComponent={

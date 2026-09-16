@@ -279,26 +279,40 @@ export default function FeedScreen({ navigation }: any) {
       <FlatList
         data={groupedSections}
         keyExtractor={(sec) => sec.id}
-        renderItem={({ item: section }) => (
-          <View style={styles.sectionWrap}>
-            <SectionHeader
-              title={section.title}
-              action={section.targetCategorySlug ? (language === 'hi' ? 'सभी देखें' : 'See all') : undefined}
-              onAction={() => {
-                if (section.targetCategorySlug) {
-                  setActiveCategory(section.targetCategorySlug)
-                }
-              }}
-            />
-            {section.items.map((newsItem) => (
-              <NewsCard
-                key={newsItem._id}
-                item={newsItem}
-                onPress={() => navigation.navigate('NewsDetail', { item: newsItem })}
+        renderItem={({ item: section, index }) => (
+          <View>
+            <View style={styles.sectionWrap}>
+              <SectionHeader
+                title={section.title}
+                action={section.targetCategorySlug ? (language === 'hi' ? 'सभी देखें' : 'See all') : undefined}
+                onAction={() => {
+                  if (section.targetCategorySlug) {
+                    setActiveCategory(section.targetCategorySlug)
+                  }
+                }}
               />
-            ))}
+              {section.items.map((newsItem) => (
+                <NewsCard
+                  key={newsItem._id}
+                  item={newsItem}
+                  onPress={() => navigation.navigate('NewsDetail', { item: newsItem })}
+                />
+              ))}
+            </View>
+            {index === 0 ? (
+              <View style={{ marginVertical: spacing.xs }}>
+                <AdBanner slot="latest_middle" />
+              </View>
+            ) : null}
           </View>
         )}
+        ListHeaderComponent={
+          groupedSections.length > 0 ? (
+            <View style={{ marginBottom: spacing.xs }}>
+              <AdBanner slot="latest_top" />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <EmptyState
             title={language === 'hi' ? 'कोई खबर नहीं मिली' : 'No news found'}
@@ -311,7 +325,7 @@ export default function FeedScreen({ navigation }: any) {
               <AarambhLoader size="sm" />
             </View>
           ) : groupedSections.length > 0 ? (
-            <AdBanner slot="feed_bottom" />
+            <AdBanner slot="latest_bottom" />
           ) : null
         }
         onEndReached={loadMore}

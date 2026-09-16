@@ -15,6 +15,7 @@ import {
   UserPreferences,
   LiveStreamItem,
   ReporterPublicProfile,
+  ActiveAdvertisementItem,
 } from '../types'
 
 type Paged<T> = { data: T[]; pagination: Pagination }
@@ -269,5 +270,45 @@ export const reporterApi = {
   },
 }
 
+export const advertisementApi = {
+  getActive: async (placement?: string, placements?: string[]): Promise<ActiveAdvertisementItem | null> => {
+    try {
+      const params: Record<string, any> = { _t: Date.now() }
+      if (placement) params.placement = placement
+      if (placements && placements.length > 0) params.placements = placements.join(',')
+      const res = await client.get<ApiResponse<any>>('/advertisements/active', { params })
+      return res.data?.data || null
+    } catch (err) {
+      console.warn('Network error in advertisementApi.getActive:', err)
+      return null
+    }
+  },
+  getActiveMap: async (placements: string[]): Promise<Record<string, ActiveAdvertisementItem>> => {
+    try {
+      const params = { placements: placements.join(','), _t: Date.now() }
+      const res = await client.get<ApiResponse<Record<string, ActiveAdvertisementItem>>>('/advertisements/active', { params })
+      return res.data?.data || {}
+    } catch (err) {
+      console.warn('Network error in advertisementApi.getActiveMap:', err)
+      return {}
+    }
+  },
+  recordClick: async (id: string) => {
+    try {
+      await client.post(`/advertisements/${id}/click`)
+    } catch (err) {
+      // silent
+    }
+  },
+  recordImpression: async (id: string) => {
+    try {
+      await client.post(`/advertisements/${id}/impression`)
+    } catch (err) {
+      // silent
+    }
+  },
+}
+
 export { uploadUrl }
 export type { Paged }
+

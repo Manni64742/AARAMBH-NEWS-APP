@@ -10,6 +10,7 @@ import { fonts, radius, spacing } from '../theme'
 import { ScaledText as Text } from '../components/ScaledText'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
+import { AdBanner } from '../components/AdBanner'
 
 function contentItemToBundleItem(c: ContentItem): BundleNewsItem {
   return {
@@ -181,71 +182,92 @@ export default function CategoryNewsListScreen({ route, navigation }: any) {
             tintColor={tc.primary}
           />
         }
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const isOrange = isOrangeTag(item.tag)
           return (
-            <Pressable
-              style={[styles.articleCard, { backgroundColor: tc.card, borderColor: tc.border }]}
-              onPress={() => openNews(item)}
-            >
-              <View style={styles.cardContent}>
-                {/* Details */}
-                <View style={styles.detailsWrap}>
-                  <View style={styles.tagRow}>
-                    {/* Badge: Orange for Breaking/Viral/Trending, Blue for topic tags */}
-                    <View
-                      style={[
-                        styles.tagBadge,
-                        isOrange
-                          ? {
-                              backgroundColor: isDark ? 'rgba(255, 87, 34, 0.16)' : '#FFF3E0',
-                              borderColor: isDark ? 'rgba(255, 87, 34, 0.35)' : '#FFCCBC',
-                            }
-                          : {
-                              backgroundColor: isDark ? 'rgba(30, 58, 138, 0.35)' : '#EFF6FF',
-                              borderColor: isDark ? '#1E3A8A' : '#DBEAFE',
-                            },
-                      ]}
-                    >
-                      <Text
+            <View>
+              <Pressable
+                style={[styles.articleCard, { backgroundColor: tc.card, borderColor: tc.border }]}
+                onPress={() => openNews(item)}
+              >
+                <View style={styles.cardContent}>
+                  {/* Details */}
+                  <View style={styles.detailsWrap}>
+                    <View style={styles.tagRow}>
+                      {/* Badge: Orange for Breaking/Viral/Trending, Blue for topic tags */}
+                      <View
                         style={[
-                          styles.tagText,
-                          { color: isOrange ? (isDark ? '#FF7043' : '#E64A19') : (isDark ? '#93C5FD' : '#1D4ED8') },
+                          styles.tagBadge,
+                          isOrange
+                            ? {
+                                backgroundColor: isDark ? 'rgba(255, 87, 34, 0.16)' : '#FFF3E0',
+                                borderColor: isDark ? 'rgba(255, 87, 34, 0.35)' : '#FFCCBC',
+                              }
+                            : {
+                                backgroundColor: isDark ? 'rgba(30, 58, 138, 0.35)' : '#EFF6FF',
+                                borderColor: isDark ? '#1E3A8A' : '#DBEAFE',
+                              },
                         ]}
                       >
-                        {getLocalizedTag(item.tag, language)}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.tagText,
+                            { color: isOrange ? (isDark ? '#FF7043' : '#E64A19') : (isDark ? '#93C5FD' : '#1D4ED8') },
+                          ]}
+                        >
+                          {getLocalizedTag(item.tag, language)}
+                        </Text>
+                      </View>
+                      <Text style={[styles.dot, { color: tc.textMuted }]}>•</Text>
+                      <Text style={[styles.timeText, { color: tc.textMuted }]}>{item.publishedAt}</Text>
                     </View>
-                    <Text style={[styles.dot, { color: tc.textMuted }]}>•</Text>
-                    <Text style={[styles.timeText, { color: tc.textMuted }]}>{item.publishedAt}</Text>
-                  </View>
-                  <Text
-                    style={[styles.articleTitle, { color: tc.text }]}
-                    numberOfLines={2}
-                    ellipsizeMode="tail"
-                  >
-                    {item.title}
-                  </Text>
-                  {item.summary ? (
                     <Text
-                      style={[styles.articleSummary, { color: tc.textMuted }]}
+                      style={[styles.articleTitle, { color: tc.text }]}
                       numberOfLines={2}
+                      ellipsizeMode="tail"
                     >
-                      {item.summary}
+                      {item.title}
                     </Text>
-                  ) : null}
-                </View>
+                    {item.summary ? (
+                      <Text
+                        style={[styles.articleSummary, { color: tc.textMuted }]}
+                        numberOfLines={2}
+                      >
+                        {item.summary}
+                      </Text>
+                    ) : null}
+                  </View>
 
-                {/* Thumbnail */}
-                <Image
-                  source={{ uri: item.imageUrl }}
-                  style={[styles.cardThumb, { backgroundColor: tc.surfaceVariant }]}
-                  contentFit="cover"
-                />
-              </View>
-            </Pressable>
+                  {/* Thumbnail */}
+                  <Image
+                    source={{ uri: item.imageUrl }}
+                    style={[styles.cardThumb, { backgroundColor: tc.surfaceVariant }]}
+                    contentFit="cover"
+                  />
+                </View>
+              </Pressable>
+              {index === 2 ? (
+                <View style={{ marginVertical: 4 }}>
+                  <AdBanner slot="category_middle" />
+                </View>
+              ) : null}
+            </View>
           )
         }}
+        ListHeaderComponent={
+          articleList.length > 0 ? (
+            <View style={{ marginBottom: 6 }}>
+              <AdBanner slot="category_top" />
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          articleList.length > 0 ? (
+            <View style={{ marginVertical: 10 }}>
+              <AdBanner slot="category_bottom" />
+            </View>
+          ) : null
+        }
       />
     </View>
   )

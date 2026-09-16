@@ -250,3 +250,16 @@ export interface MarketIndexItem {
   changePct: number
   isLive?: boolean
 }
+
+export interface ActiveAdvertisementItem {
+  _id: string
+  title: string
+  placement: string
+  script?: string
+  targetUrl?: string
+  imageUrl?: string
+  description?: string
+  status: 'ACTIVE' | 'INACTIVE'
+  priority?: number
+}
+
