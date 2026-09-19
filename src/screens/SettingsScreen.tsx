@@ -15,12 +15,7 @@ import { ScaledText as Text } from '../components/ScaledText'
 import { AarambhLoader } from '../components/AarambhLoader'
 import { Ionicons } from '@expo/vector-icons'
 import Constants from 'expo-constants'
-import {
-  registerForPushNotificationsAsync,
-  runPushNotificationDiagnostic,
-  sendTestPushNotification,
-  DiagnosticResult,
-} from '../services/notificationService'
+import { registerForPushNotificationsAsync } from '../services/notificationService'
 
 const GUEST_NOTIFICATIONS_KEY = 'aarambh_guest_notifications'
 
@@ -35,9 +30,6 @@ export default function SettingsScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true)
   const [notif, setNotif] = useState<Record<string, boolean>>({})
   const [pw, setPw] = useState({ current: '', next: '' })
-  const [diagResult, setDiagResult] = useState<DiagnosticResult | null>(null)
-  const [diagLoading, setDiagLoading] = useState(false)
-  const [testLoading, setTestLoading] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -101,48 +93,6 @@ export default function SettingsScreen({ navigation }: any) {
       setPw({ current: '', next: '' })
     } catch (e) {
       error(errorMessage(e))
-    }
-  }
-
-  const handleRunDiagnostic = async () => {
-    setDiagLoading(true)
-    try {
-      const res = await runPushNotificationDiagnostic()
-      setDiagResult(res)
-      if (res.ok) {
-        Alert.alert(
-          'पुश नोटिफिकेशन सफल ✅',
-          `डिवाइस सफलतापूर्वक कनेक्टेड और रजिस्टर्ड है!\n\nBuild: v${res.appVersion}\nPermission: ${res.permissionStatus}\nToken: ${res.token?.substring(0, 28)}...\nServer: Active & Registered ✅`
-        )
-      } else {
-        Alert.alert(
-          'नोटिफिकेशन डायग्नोस्टिक रिपोर्ट ⚠️',
-          `Status: Failed\nStep: ${res.step}\nPermission: ${res.permissionStatus}\nDetails: ${res.error || 'टोकन प्राप्त नहीं हुआ'}`
-        )
-      }
-    } catch (e: any) {
-      Alert.alert('जांच त्रुटि', e?.message || 'जांच पूरी नहीं हो सकी')
-    } finally {
-      setDiagLoading(false)
-    }
-  }
-
-  const handleSendTestPush = async () => {
-    setTestLoading(true)
-    try {
-      const res = await sendTestPushNotification(diagResult?.token || undefined)
-      if (res.success) {
-        Alert.alert(
-          'टेस्ट पुश भेजा गया! 🔔',
-          'सर्वर से Google Firebase (FCM) के जरिए आपकी डिवाइस पर टेस्ट नोटिफिकेशन भेज दिया गया है। कृपया अपने फोन का नोटिफिकेशन शेड चेक करें!'
-        )
-      } else {
-        Alert.alert('टेस्ट पुश विफल ❌', res.message)
-      }
-    } catch (e: any) {
-      Alert.alert('त्रुटि', e?.message || 'टेस्ट नोटिफिकेशन नहीं भेजा जा सका')
-    } finally {
-      setTestLoading(false)
     }
   }
 
@@ -247,54 +197,6 @@ export default function SettingsScreen({ navigation }: any) {
         ))}
       </View>
 
-      {/* Push Notification Diagnostics & Live Verification */}
-      <Text style={[styles.section, { color: colors.text }]}>पुश नोटिफिकेशन स्थिति (Push Diagnostics)</Text>
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, paddingVertical: 14 }]}>
-        <View style={{ marginBottom: 12 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <Text style={{ fontSize: 13, color: colors.textLight }}>App Build</Text>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
-              v{Constants.expoConfig?.version || '1.0.2'} (Build #{Constants.expoConfig?.android?.versionCode || 3})
-            </Text>
-          </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <Text style={{ fontSize: 13, color: colors.textLight }}>Notification Status</Text>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: diagResult?.ok ? baseColors.success : colors.text }}>
-              {diagResult ? (diagResult.ok ? 'सक्रिय एवं कनेक्टेड ✅' : 'पुनः जांच आवश्यक ⚠️') : 'जांच के लिए बटन दबाएं'}
-            </Text>
-          </View>
-          {diagResult?.token ? (
-            <Text style={{ fontSize: 11, color: colors.textLight, marginTop: 4 }} numberOfLines={1}>
-              Token: {diagResult.token.substring(0, 24)}...
-            </Text>
-          ) : null}
-        </View>
-
-        <Pressable
-          style={[styles.btn, { backgroundColor: colors.primary, marginBottom: 10 }]}
-          disabled={diagLoading}
-          onPress={handleRunDiagnostic}
-        >
-          {diagLoading ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.btnText}>🔄 स्थिति जांचें और टोकन जोड़ें (Check Status)</Text>
-          )}
-        </Pressable>
-
-        <Pressable
-          style={[styles.btn, { backgroundColor: '#1b873f' }]}
-          disabled={testLoading}
-          onPress={handleSendTestPush}
-        >
-          {testLoading ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.btnText}>📨 टेस्ट नोटिफिकेशन भेजें (Send Test Push)</Text>
-          )}
-        </Pressable>
-      </View>
-
       {user && follows.length > 0 ? (
         <>
           <Text style={[styles.section, { color: colors.text }]}>Following</Text>
@@ -337,6 +239,10 @@ export default function SettingsScreen({ navigation }: any) {
           </View>
         </>
       ) : null}
+
+      <Text style={{ textAlign: 'center', fontSize: 12, color: colors.textLight, marginTop: 24, marginBottom: 12 }}>
+        Aarambh News • v{Constants.expoConfig?.version || '1.0.2'} (Build #{Constants.expoConfig?.android?.versionCode || 3})
+      </Text>
     </ScrollView>
   )
 }
