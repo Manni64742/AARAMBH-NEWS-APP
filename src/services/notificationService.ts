@@ -126,7 +126,7 @@ export interface DiagnosticResult {
 
 export async function runPushNotificationDiagnostic(): Promise<DiagnosticResult> {
   const deviceId = await getOrCreateDeviceId()
-  const appVersion = Constants.expoConfig?.version || '1.0.1'
+  const appVersion = Constants.expoConfig?.version || '1.0.2'
   let step = 'init'
   let permissionStatus = 'unknown'
   let token: string | null = null
@@ -143,6 +143,10 @@ export async function runPushNotificationDiagnostic(): Promise<DiagnosticResult>
     if (perm.status !== 'granted') {
       const req = await Notifications.requestPermissionsAsync()
       permissionStatus = req.status
+      if (permissionStatus === 'granted') {
+        // Allow Android FCM / Google Play Services permission state to settle
+        await new Promise((resolve) => setTimeout(resolve, 800))
+      }
     }
 
     if (permissionStatus !== 'granted') {
@@ -336,7 +340,7 @@ export function registerForPushNotificationsAsync(): Promise<string | null> {
 
 async function executePushRegistration(): Promise<string | null> {
   const deviceId = await getOrCreateDeviceId()
-  const appVersion = Constants.expoConfig?.version || '1.0.1'
+  const appVersion = Constants.expoConfig?.version || '1.0.2'
 
   try {
     await setupNotificationChannel()
@@ -346,6 +350,10 @@ async function executePushRegistration(): Promise<string | null> {
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync()
       finalStatus = status
+      if (finalStatus === 'granted') {
+        // Allow Android FCM / Google Play Services permission state to settle
+        await new Promise((resolve) => setTimeout(resolve, 800))
+      }
     }
 
     await sendPushDebugLog({
@@ -391,6 +399,15 @@ async function executePushRegistration(): Promise<string | null> {
           // Wait 2 seconds to let Google Play Services settle
           await new Promise((resolve) => setTimeout(resolve, 2000))
         }
+      }
+    }
+
+    // Fallback to locally stored token if transient FCM error occurred
+    if (!token) {
+      const cachedToken = await AsyncStorage.getItem(PUSH_TOKEN_KEY).catch(() => null)
+      if (cachedToken) {
+        console.log('[Notification] Using cached push token from storage:', cachedToken)
+        token = cachedToken
       }
     }
 

@@ -14,6 +14,7 @@ import { useLanguage, AppLanguage } from '../context/LanguageContext'
 import { ScaledText as Text } from '../components/ScaledText'
 import { AarambhLoader } from '../components/AarambhLoader'
 import { Ionicons } from '@expo/vector-icons'
+import Constants from 'expo-constants'
 import {
   registerForPushNotificationsAsync,
   runPushNotificationDiagnostic,
@@ -252,7 +253,9 @@ export default function SettingsScreen({ navigation }: any) {
         <View style={{ marginBottom: 12 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
             <Text style={{ fontSize: 13, color: colors.textLight }}>App Build</Text>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>v1.0.1 (Build #2)</Text>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }}>
+              v{Constants.expoConfig?.version || '1.0.2'} (Build #{Constants.expoConfig?.android?.versionCode || 3})
+            </Text>
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
             <Text style={{ fontSize: 13, color: colors.textLight }}>Notification Status</Text>
