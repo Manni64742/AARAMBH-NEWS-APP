@@ -2,7 +2,7 @@
   "expo": {
     "name": "Aarambh News",
     "slug": "aarambh-news",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/aarambh_news_launcher_icon.png",
     "userInterfaceStyle": "light",
@@ -17,6 +17,7 @@
     },
     "android": {
       "package": "com.aarambh.news",
+      "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
