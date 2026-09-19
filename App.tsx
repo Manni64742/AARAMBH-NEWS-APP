@@ -1,4 +1,5 @@
 import React from 'react'
+import { AppState } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
@@ -30,6 +31,21 @@ function AppContent() {
     // 1. Register device for push notifications
     registerForPushNotificationsAsync().catch(() => {})
 
+    // Delayed retries to capture permission acceptance or network readiness
+    const t1 = setTimeout(() => {
+      registerForPushNotificationsAsync().catch(() => {})
+    }, 2500)
+    const t2 = setTimeout(() => {
+      registerForPushNotificationsAsync().catch(() => {})
+    }, 7000)
+
+    // Ensure token is verified/registered when app returns to foreground
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        registerForPushNotificationsAsync().catch(() => {})
+      }
+    })
+
     // 2. Listen for clicks on Android notification tray / slider
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data
@@ -46,6 +62,9 @@ function AppContent() {
     }, 30000)
 
     return () => {
+      clearTimeout(t1)
+      clearTimeout(t2)
+      appStateSub.remove()
       sub.remove()
       clearInterval(interval)
     }

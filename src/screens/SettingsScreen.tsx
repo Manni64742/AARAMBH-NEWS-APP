@@ -14,6 +14,7 @@ import { useLanguage, AppLanguage } from '../context/LanguageContext'
 import { ScaledText as Text } from '../components/ScaledText'
 import { AarambhLoader } from '../components/AarambhLoader'
 import { Ionicons } from '@expo/vector-icons'
+import { registerForPushNotificationsAsync } from '../services/notificationService'
 
 const GUEST_NOTIFICATIONS_KEY = 'aarambh_guest_notifications'
 
@@ -50,6 +51,7 @@ export default function SettingsScreen({ navigation }: any) {
         setCategories([])
       } finally {
         setLoading(false)
+        registerForPushNotificationsAsync().catch(() => {})
       }
     }
     load()
