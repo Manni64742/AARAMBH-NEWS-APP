@@ -119,11 +119,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 
     // Retrieve Expo Push Token with explicit projectId
     let token: string | null = null
-    const effectiveProjectId =
-      EAS_PROJECT_ID ||
-      (Constants.expoConfig?.extra?.eas?.projectId as string | undefined) ??
-      (Constants.easConfig?.projectId as string | undefined) ??
-      '980071c6-0de9-4ea3-bfa9-c837696a6d7d'
+    const effectiveProjectId = EAS_PROJECT_ID || '980071c6-0de9-4ea3-bfa9-c837696a6d7d'
 
     try {
       const tokenData = await Notifications.getExpoPushTokenAsync({
