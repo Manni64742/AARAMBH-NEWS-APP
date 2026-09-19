@@ -161,14 +161,25 @@ export async function runPushNotificationDiagnostic(): Promise<DiagnosticResult>
 
     step = 'fetchExpoToken'
     const effectiveProjectId = EAS_PROJECT_ID || '980071c6-0de9-4ea3-bfa9-c837696a6d7d'
-    try {
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: effectiveProjectId,
-      })
-      token = tokenData.data
-      await AsyncStorage.setItem(PUSH_TOKEN_KEY, token)
-    } catch (tokenErr: any) {
-      errorMsg = tokenErr?.message || String(tokenErr)
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const tokenData = await Notifications.getExpoPushTokenAsync({
+          projectId: effectiveProjectId,
+        })
+        token = tokenData.data
+        if (token) {
+          await AsyncStorage.setItem(PUSH_TOKEN_KEY, token)
+          break
+        }
+      } catch (tokenErr: any) {
+        errorMsg = tokenErr?.message || String(tokenErr)
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, 1500))
+        }
+      }
+    }
+
+    if (!token) {
       await sendPushDebugLog({
         step: 'DIAGNOSTIC_TOKEN_ERROR',
         error: errorMsg,
@@ -301,11 +312,29 @@ export async function sendTestPushNotification(customToken?: string): Promise<{ 
   }
 }
 
+let registrationPromise: Promise<string | null> | null = null
+
 /**
  * Request notification permissions and register the device's push token with the backend,
  * including user's selected location and interests for targeted delivery.
  */
-export async function registerForPushNotificationsAsync(): Promise<string | null> {
+export function registerForPushNotificationsAsync(): Promise<string | null> {
+  if (registrationPromise) {
+    return registrationPromise
+  }
+
+  registrationPromise = (async () => {
+    try {
+      return await executePushRegistration()
+    } finally {
+      registrationPromise = null
+    }
+  })()
+
+  return registrationPromise
+}
+
+async function executePushRegistration(): Promise<string | null> {
   const deviceId = await getOrCreateDeviceId()
   const appVersion = Constants.expoConfig?.version || '1.0.1'
 
@@ -332,29 +361,46 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       return null
     }
 
-    // Retrieve Expo Push Token with explicit projectId
+    // Retrieve Expo Push Token with explicit projectId & serial retry for Android FCM
     let token: string | null = null
     const effectiveProjectId = EAS_PROJECT_ID || '980071c6-0de9-4ea3-bfa9-c837696a6d7d'
+    let lastPushError: any = null
 
-    try {
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: effectiveProjectId,
-      })
-      token = tokenData.data
-      console.log('[Notification] Successfully acquired Expo Push Token:', token)
-      await sendPushDebugLog({
-        step: 'TOKEN_FETCH_SUCCESS',
-        token,
-        deviceId,
-        appVersion,
-      })
-    } catch (pushErr: any) {
-      const pushErrMsg = pushErr?.message || String(pushErr)
-      console.error('[Notification] Expo push token fetch error:', pushErrMsg)
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const tokenData = await Notifications.getExpoPushTokenAsync({
+          projectId: effectiveProjectId,
+        })
+        token = tokenData.data
+        if (token) {
+          console.log('[Notification] Successfully acquired Expo Push Token:', token)
+          await sendPushDebugLog({
+            step: 'TOKEN_FETCH_SUCCESS',
+            token,
+            attempt,
+            deviceId,
+            appVersion,
+          })
+          break
+        }
+      } catch (pushErr: any) {
+        lastPushError = pushErr
+        const pushErrMsg = pushErr?.message || String(pushErr)
+        console.warn(`[Notification] Token attempt ${attempt} failed:`, pushErrMsg)
+        if (attempt < 3) {
+          // Wait 2 seconds to let Google Play Services settle
+          await new Promise((resolve) => setTimeout(resolve, 2000))
+        }
+      }
+    }
+
+    if (!token && lastPushError) {
+      const pushErrMsg = lastPushError?.message || String(lastPushError)
+      console.error('[Notification] Expo push token fetch error after retries:', pushErrMsg)
       await sendPushDebugLog({
         step: 'TOKEN_FETCH_ERROR',
         error: pushErrMsg,
-        stack: pushErr?.stack,
+        stack: lastPushError?.stack,
         deviceId,
         appVersion,
       })
