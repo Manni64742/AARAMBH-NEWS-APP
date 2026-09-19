@@ -23,7 +23,7 @@ const UNREAD_COUNT_KEY = 'aarambh_unread_notif_count'
 const EAS_PROJECT_ID =
   (Constants.expoConfig?.extra?.eas?.projectId as string | undefined) ??
   (Constants.easConfig?.projectId as string | undefined) ??
-  null
+  '980071c6-0de9-4ea3-bfa9-c837696a6d7d'
 
 type UnreadListener = (count: number) => void
 const unreadListeners: Set<UnreadListener> = new Set()
@@ -119,13 +119,20 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 
     // Retrieve Expo Push Token with explicit projectId
     let token: string | null = null
+    const effectiveProjectId =
+      EAS_PROJECT_ID ||
+      (Constants.expoConfig?.extra?.eas?.projectId as string | undefined) ??
+      (Constants.easConfig?.projectId as string | undefined) ??
+      '980071c6-0de9-4ea3-bfa9-c837696a6d7d'
+
     try {
-      const tokenData = await Notifications.getExpoPushTokenAsync(
-        EAS_PROJECT_ID ? { projectId: EAS_PROJECT_ID } : undefined
-      )
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: effectiveProjectId,
+      })
       token = tokenData.data
+      console.log('[Notification] Successfully acquired Expo Push Token:', token)
     } catch (pushErr: any) {
-      console.log('[Notification] Expo push token fetch note:', pushErr?.message)
+      console.error('[Notification] Expo push token fetch error:', pushErr?.message || pushErr)
     }
 
     const deviceId = await getOrCreateDeviceId()
@@ -153,24 +160,29 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     if (token) {
       await AsyncStorage.setItem(PUSH_TOKEN_KEY, token)
       // Register with Aarambh News backend
-      await axios
-        .post(`${API_URL}/notifications/push-token`, {
-          token,
-          deviceId,
-          platform: Platform.OS,
-          language: 'hi',
-          state: userState,
-          city: userCity,
-          interests: userInterests,
-        })
-        .catch((err) => {
-          console.log('[Notification] Could not register token with server:', err?.message)
-        })
+      try {
+        const resp = await axios.post(
+          `${API_URL}/notifications/push-token`,
+          {
+            token,
+            deviceId,
+            platform: Platform.OS,
+            language: 'hi',
+            state: userState,
+            city: userCity,
+            interests: userInterests,
+          },
+          { timeout: 15000 }
+        )
+        console.log('[Notification] Device push token registered with server response:', resp.data?.success)
+      } catch (err: any) {
+        console.error('[Notification] Could not register token with server:', err?.message || err)
+      }
     }
 
     return token
   } catch (error) {
-    console.log('[Notification] registerForPushNotificationsAsync error:', error)
+    console.error('[Notification] registerForPushNotificationsAsync fatal error:', error)
     return null
   }
 }
