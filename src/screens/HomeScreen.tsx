@@ -24,8 +24,16 @@ import { CategoryChip, HorizontalNewsCard, NewsCard, SectionHeader } from '../co
 import { NewsSlider } from '../components/NewsSlider'
 import { AdBanner } from '../components/AdBanner'
 import MarketTicker from '../components/MarketTicker'
-import { EmptyState, ErrorState, SkeletonCard } from '../components/States'
-import { AarambhLoader } from '../components/AarambhLoader'
+import {
+  EmptyState,
+  ErrorState,
+  SkeletonCard,
+  NewsCardSkeleton,
+  NewsSliderSkeleton,
+  BundleCardSkeleton,
+  BreakingTickerSkeleton,
+  AarambhLoader,
+} from '../components/States'
 import { usePagedFeed } from '../hooks/usePagedFeed'
 import { subscribeUnreadCount, markAllNotificationsSeen } from '../services/notificationService'
 
@@ -286,9 +294,11 @@ export default function HomeScreen({ navigation }: any) {
   const [thematicSections, setThematicSections] = useState<ThematicSectionData[]>([])
   const [trendingList, setTrendingList] = useState<TrendingRankItem[]>([])
   const [mostReadList, setMostReadList] = useState<any[]>([])
+  const [bundlesLoading, setBundlesLoading] = useState(true)
 
   const loadHomeBundles = useCallback(() => {
     let isMounted = true
+    setBundlesLoading(true)
     contentApi.homeBundles(language).then((data) => {
       if (!isMounted) return
       if (data && Array.isArray(data.thematicSections)) {
@@ -300,7 +310,9 @@ export default function HomeScreen({ navigation }: any) {
       if (data && Array.isArray(data.mostRead)) {
         setMostReadList(data.mostRead)
       }
-    }).catch(() => {})
+    }).catch(() => {}).finally(() => {
+      if (isMounted) setBundlesLoading(false)
+    })
 
     return () => { isMounted = false }
   }, [language])
@@ -633,7 +645,11 @@ export default function HomeScreen({ navigation }: any) {
   const Header = (
     <View>
       {/* 1. BREAKING NEWS TICKER */}
-      <BreakingTicker items={breakingItems} onPress={openNews} />
+      {breakingItems.length > 0 ? (
+        <BreakingTicker items={breakingItems} onPress={openNews} />
+      ) : feed.loading && feed.items.length === 0 ? (
+        <BreakingTickerSkeleton />
+      ) : null}
 
       {/* 2. LIVE NEWS BANNER (YouTube streams - hidden on Market tab) */}
       {!isMarket && <LiveBanner streams={liveStreams} onPress={openLive} />}
@@ -660,6 +676,18 @@ export default function HomeScreen({ navigation }: any) {
             }
           />
         </View>
+      ) : feed.loading && feed.items.length === 0 ? (
+        <View style={styles.heroWrap}>
+          <NewsSliderSkeleton
+            title={
+              isMarket
+                ? language === 'hi' ? 'मार्केट मुख्य खबरें' : 'Market Headlines'
+                : activeCatObj
+                  ? language === 'hi' ? `${activeCatObj.name.hi || activeCatObj.name.en} मुख्य खबरें` : `${activeCatObj.name.en} Headlines`
+                  : language === 'hi' ? 'मुख्य खबरें' : 'Headlines'
+            }
+          />
+        </View>
       ) : null}
 
       {/* ── IF ON HOME (ALL): RENDER THEMATIC BUNDLE SECTIONS ── */}
@@ -667,10 +695,9 @@ export default function HomeScreen({ navigation }: any) {
         <View>
           {/* DYNAMIC CATEGORY THEMATIC SECTIONS */}
           {thematicSections.length === 0 ? (
-            <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-              <SkeletonCard />
-              <SkeletonCard />
-            </View>
+            bundlesLoading || (feed.loading && feed.items.length === 0) ? (
+              <BundleCardSkeleton title={language === 'hi' ? 'देश' : 'India'} />
+            ) : null
           ) : (
             thematicSections.map((sec) => (
               <View key={sec.id} style={styles.thematicSection}>
@@ -889,9 +916,11 @@ export default function HomeScreen({ navigation }: any) {
       )}
 
       {/* 9. ADVERTISEMENT SECTION */}
-      <View style={styles.adSlotWrap}>
-        <AdBanner slot="home_top" />
-      </View>
+      {(!feed.loading || feed.items.length > 0) ? (
+        <View style={styles.adSlotWrap}>
+          <AdBanner slot="home_top" />
+        </View>
+      ) : null}
 
       {/* 10. CONTINUOUS NEWS FEED SECTION HEADER */}
       <SectionHeader
@@ -957,8 +986,9 @@ export default function HomeScreen({ navigation }: any) {
         ListEmptyComponent={
           feed.loading ? (
             <View>
-              <SkeletonCard />
-              <SkeletonCard />
+              <NewsCardSkeleton />
+              <NewsCardSkeleton />
+              <NewsCardSkeleton />
             </View>
           ) : feed.error ? (
             <ErrorState message={feed.error} onRetry={feed.refresh} />
