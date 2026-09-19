@@ -330,6 +330,24 @@ async function executePushRegistration(): Promise<string | null> {
   const deviceId = await getOrCreateDeviceId()
   const appVersion = Constants.expoConfig?.version || '1.0.2'
 
+  let deviceModel: string | undefined
+  let osVersion: string | undefined
+  try {
+    if (Platform.OS === 'android') {
+      const constants = Platform.constants as any
+      const manufacturer = constants?.Manufacturer || ''
+      const model = constants?.Model || ''
+      const brand = constants?.Brand || ''
+      deviceModel = [manufacturer, model || brand].filter(Boolean).join(' ').trim() || 'Android Device'
+      osVersion = `Android ${constants?.Release || Platform.Version}`
+    } else if (Platform.OS === 'ios') {
+      deviceModel = (Platform.constants as any)?.systemName || 'Apple Device'
+      osVersion = `iOS ${Platform.Version}`
+    }
+  } catch {
+    // ignore
+  }
+
   try {
     await setupNotificationChannel()
 
@@ -439,6 +457,8 @@ async function executePushRegistration(): Promise<string | null> {
             city: userCity,
             interests: userInterests,
             appVersion,
+            deviceModel,
+            osVersion,
           },
           { timeout: 15000 }
         )
