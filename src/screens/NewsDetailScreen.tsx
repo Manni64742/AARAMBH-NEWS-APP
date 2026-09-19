@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -55,64 +55,452 @@ function formatCommentTime(dateStr?: string | Date) {
   }
 }
 
-const stripHtml = (html = '') => html.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
+const decodeHtmlEntities = (text = '') => {
+  if (!text) return ''
+  return text
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&mdash;|&#8212;/gi, '—')
+    .replace(/&ndash;|&#8211;/gi, '–')
+    .replace(/&bull;/gi, '•')
+    .replace(/&#8216;|&#8217;/gi, "'")
+    .replace(/&#8220;|&#8221;/gi, '"')
+}
+
+const stripHtml = (html = '') => {
+  if (!html) return ''
+  const decoded = decodeHtmlEntities(html)
+  return decoded
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim()
+}
 
 const inlineImageSource = (tag: string) => {
   const match = tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)
   return match?.[1] ? mediaUrl(match[1]) : null
 }
 
-function TextBlockView({ html = '' }: { html?: string }) {
-  const { colors, fontScale } = useTheme()
-  const parts = html.split(/(<img\b[^>]*>)/gi)
-  const hasInlineImage = parts.some((part) => /^<img\b/i.test(part) && inlineImageSource(part))
-  if (!hasInlineImage) {
-    const text = stripHtml(html)
-    return (
-      <NativeText
-        style={[
-          styles.articleText,
-          {
-            color: colors.text,
-            fontFamily: fontFor(text, 400),
-            fontSize: Math.round(18 * fontScale),
-            lineHeight: Math.round(30 * fontScale),
-          },
-        ]}
-      >
-        {text}
-      </NativeText>
-    )
+interface InlineSegment {
+  text: string
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean
+  href?: string
+}
+
+function parseInlineFormatting(htmlString: string): InlineSegment[] {
+  if (!htmlString) return []
+  const tagRegex = /(<\/?(?:b|strong|i|em|u|a|code|mark|br)\b[^>]*>)/gi
+  const tokens = htmlString.split(tagRegex)
+  const segments: InlineSegment[] = []
+
+  let boldDepth = 0
+  let italicDepth = 0
+  let underlineDepth = 0
+  const linkStack: string[] = []
+
+  for (const token of tokens) {
+    if (!token) continue
+
+    if (/^<br\s*\/?>$/i.test(token)) {
+      segments.push({
+        text: '\n',
+        bold: boldDepth > 0,
+        italic: italicDepth > 0,
+        underline: underlineDepth > 0,
+        href: linkStack[linkStack.length - 1],
+      })
+      continue
+    }
+
+    if (/^<(?:strong|b)\b/i.test(token)) {
+      boldDepth++
+      continue
+    }
+    if (/^<\/(?:strong|b)>/i.test(token)) {
+      boldDepth = Math.max(0, boldDepth - 1)
+      continue
+    }
+
+    if (/^<(?:em|i)\b/i.test(token)) {
+      italicDepth++
+      continue
+    }
+    if (/^<\/(?:em|i)>/i.test(token)) {
+      italicDepth = Math.max(0, italicDepth - 1)
+      continue
+    }
+
+    if (/^<u\b/i.test(token)) {
+      underlineDepth++
+      continue
+    }
+    if (/^<\/u>/i.test(token)) {
+      underlineDepth = Math.max(0, underlineDepth - 1)
+      continue
+    }
+
+    if (/^<a\b/i.test(token)) {
+      const hrefMatch = token.match(/\bhref\s*=\s*["']([^"']+)["']/i)
+      linkStack.push(hrefMatch ? hrefMatch[1] : '')
+      continue
+    }
+    if (/^<\/a>/i.test(token)) {
+      linkStack.pop()
+      continue
+    }
+
+    if (/^<[^>]+>$/.test(token)) {
+      continue
+    }
+
+    const decoded = decodeHtmlEntities(token)
+    if (decoded) {
+      segments.push({
+        text: decoded,
+        bold: boldDepth > 0,
+        italic: italicDepth > 0,
+        underline: underlineDepth > 0,
+        href: linkStack[linkStack.length - 1] || undefined,
+      })
+    }
   }
+
+  return segments
+}
+
+function FormattedInlineText({
+  html,
+  baseStyle,
+  colors,
+  fontScale,
+}: {
+  html: string
+  baseStyle: any
+  colors: any
+  fontScale: number
+}) {
+  const segments = useMemo(() => parseInlineFormatting(html), [html])
+  if (segments.length === 0) return null
+
   return (
-    <View style={styles.articleFlow}>
-      {parts.map((part, index) => {
-        if (/^<img\b/i.test(part)) {
-          const source = inlineImageSource(part)
-          return source ? (
-            <View key={`image-${index}`} style={styles.inlineImageWrap}>
-              <Image source={{ uri: source }} style={styles.inlineImage} contentFit="contain" />
-              <ArticleWatermark />
-            </View>
-          ) : null
-        }
-        const text = stripHtml(part)
-        return text ? (
+    <NativeText style={baseStyle}>
+      {segments.map((seg, idx) => {
+        const isBold = Boolean(seg.bold)
+        const isItalic = Boolean(seg.italic)
+        const isUnderline = Boolean(seg.underline)
+        const isLink = Boolean(seg.href)
+
+        const segFont = fontFor(seg.text, isBold ? 700 : 400)
+        return (
           <NativeText
-            key={`text-${index}`}
+            key={idx}
             style={[
-              styles.articleText,
               {
-                color: colors.text,
-                fontFamily: fontFor(text, 400),
-                fontSize: Math.round(18 * fontScale),
-                lineHeight: Math.round(30 * fontScale),
+                fontFamily: segFont,
+                fontWeight: isBold ? '700' : '400',
+                fontStyle: isItalic ? 'italic' : 'normal',
+                textDecorationLine: isUnderline || isLink ? 'underline' : 'none',
+                color: isLink ? colors.primary : (baseStyle && baseStyle.color) || colors.text,
               },
             ]}
+            onPress={isLink && seg.href ? () => Linking.openURL(seg.href!).catch(() => {}) : undefined}
           >
-            {text}
+            {seg.text}
           </NativeText>
-        ) : null
+        )
+      })}
+    </NativeText>
+  )
+}
+
+interface ArticleContentBlock {
+  type: 'PARAGRAPH' | 'HEADING' | 'QUOTE' | 'LIST' | 'IMAGE' | 'DIVIDER'
+  level?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
+  ordered?: boolean
+  items?: string[]
+  src?: string
+  rawHtml: string
+}
+
+function parseHtmlToBlocks(rawHtml: string): ArticleContentBlock[] {
+  if (!rawHtml) return []
+
+  const imgParts = rawHtml.split(/(<img\b[^>]*>)/gi)
+  const blocks: ArticleContentBlock[] = []
+
+  for (const part of imgParts) {
+    if (!part) continue
+
+    if (/^<img\b/i.test(part)) {
+      const src = inlineImageSource(part)
+      if (src) {
+        blocks.push({
+          type: 'IMAGE',
+          src,
+          rawHtml: part,
+        })
+      }
+      continue
+    }
+
+    const hasBlockTags = /<(?:p|div|h[1-6]|blockquote|ul|ol|hr)\b/i.test(part)
+
+    if (hasBlockTags) {
+      const blockRegex = /(<(?:p|div|h[1-6]|blockquote|ul|ol|hr)\b[\s\S]*?<\/(?:p|div|h[1-6]|blockquote|ul|ol)>|<hr\b[^>]*>)/gi
+      const rawBlocks = part.split(blockRegex)
+
+      for (const b of rawBlocks) {
+        const trimmed = b.trim()
+        if (!trimmed) continue
+
+        const hMatch = trimmed.match(/^<(h[1-6])\b[^>]*>([\s\S]*?)<\/\1>$/i)
+        if (hMatch) {
+          const inner = hMatch[2].trim()
+          if (inner) {
+            blocks.push({
+              type: 'HEADING',
+              level: hMatch[1].toLowerCase() as any,
+              rawHtml: inner,
+            })
+          }
+          continue
+        }
+
+        const qMatch = trimmed.match(/^<blockquote\b[^>]*>([\s\S]*?)<\/blockquote>$/i)
+        if (qMatch) {
+          const inner = qMatch[1].trim()
+          if (inner) {
+            blocks.push({
+              type: 'QUOTE',
+              rawHtml: inner,
+            })
+          }
+          continue
+        }
+
+        const listMatch = trimmed.match(/^<(ul|ol)\b[^>]*>([\s\S]*?)<\/\1>$/i)
+        if (listMatch) {
+          const isOrdered = listMatch[1].toLowerCase() === 'ol'
+          const liMatches = [...listMatch[2].matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)]
+          const items = liMatches.map((m) => m[1].trim()).filter(Boolean)
+          if (items.length > 0) {
+            blocks.push({
+              type: 'LIST',
+              ordered: isOrdered,
+              items,
+              rawHtml: trimmed,
+            })
+          }
+          continue
+        }
+
+        if (/^<hr\b[^>]*>$/i.test(trimmed)) {
+          blocks.push({
+            type: 'DIVIDER',
+            rawHtml: trimmed,
+          })
+          continue
+        }
+
+        const pMatch = trimmed.match(/^<(?:p|div)\b[^>]*>([\s\S]*?)<\/(?:p|div)>$/i)
+        if (pMatch) {
+          const inner = pMatch[1].trim()
+          if (inner) {
+            blocks.push({
+              type: 'PARAGRAPH',
+              rawHtml: inner,
+            })
+          }
+          continue
+        }
+
+        const subParts = trimmed.split(/(?:<br\s*\/?>\s*){2,}|\n\n+/gi)
+        for (const sp of subParts) {
+          const cleanSp = sp.trim()
+          if (cleanSp) {
+            blocks.push({
+              type: 'PARAGRAPH',
+              rawHtml: cleanSp,
+            })
+          }
+        }
+      }
+    } else {
+      const subParts = part.split(/(?:<br\s*\/?>\s*){2,}|\n\n+/gi)
+      for (const sp of subParts) {
+        const cleanSp = sp.trim()
+        if (cleanSp) {
+          blocks.push({
+            type: 'PARAGRAPH',
+            rawHtml: cleanSp,
+          })
+        }
+      }
+    }
+  }
+
+  return blocks
+}
+
+function TextBlockView({ html = '' }: { html?: string }) {
+  const { colors, fontScale } = useTheme()
+  const contentBlocks = useMemo(() => parseHtmlToBlocks(html), [html])
+
+  if (!contentBlocks.length) return null
+
+  return (
+    <View style={styles.articleFlow}>
+      {contentBlocks.map((block, index) => {
+        if (block.type === 'IMAGE' && block.src) {
+          return (
+            <View key={`img-${index}`} style={styles.inlineImageWrap}>
+              <Image source={{ uri: block.src }} style={styles.inlineImage} contentFit="contain" />
+              <ArticleWatermark compact />
+            </View>
+          )
+        }
+
+        if (block.type === 'HEADING') {
+          const isH3OrSmaller =
+            block.level === 'h3' || block.level === 'h4' || block.level === 'h5' || block.level === 'h6'
+          const hFontSize = Math.round((isH3OrSmaller ? 20 : 23) * fontScale)
+          const hLineHeight = Math.round((isH3OrSmaller ? 28 : 32) * fontScale)
+          return (
+            <View
+              key={`h-${index}`}
+              style={{
+                marginTop: Math.round(20 * fontScale),
+                marginBottom: Math.round(8 * fontScale),
+              }}
+            >
+              <FormattedInlineText
+                html={block.rawHtml}
+                baseStyle={[
+                  styles.blockHeading,
+                  {
+                    marginTop: 0,
+                    color: colors.text,
+                    fontSize: hFontSize,
+                    lineHeight: hLineHeight,
+                  },
+                ]}
+                colors={colors}
+                fontScale={fontScale}
+              />
+            </View>
+          )
+        }
+
+        if (block.type === 'QUOTE') {
+          return (
+            <View
+              key={`quote-${index}`}
+              style={[
+                styles.quote,
+                {
+                  backgroundColor: colors.primarySoft,
+                  borderLeftColor: colors.primary,
+                  marginVertical: Math.round(14 * fontScale),
+                },
+              ]}
+            >
+              <FormattedInlineText
+                html={block.rawHtml}
+                baseStyle={[
+                  styles.quoteText,
+                  {
+                    color: colors.text,
+                    fontSize: Math.round(16 * fontScale),
+                    lineHeight: Math.round(25 * fontScale),
+                    fontStyle: 'italic',
+                  },
+                ]}
+                colors={colors}
+                fontScale={fontScale}
+              />
+            </View>
+          )
+        }
+
+        if (block.type === 'LIST' && block.items?.length) {
+          return (
+            <View
+              key={`list-${index}`}
+              style={{
+                marginVertical: Math.round(10 * fontScale),
+                gap: Math.round(6 * fontScale),
+              }}
+            >
+              {block.items.map((itemHtml, liIdx) => (
+                <View key={liIdx} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                  <NativeText
+                    style={{
+                      color: colors.primary,
+                      fontSize: Math.round(16 * fontScale),
+                      lineHeight: Math.round(28 * fontScale),
+                      fontWeight: '700',
+                    }}
+                  >
+                    {block.ordered ? `${liIdx + 1}.` : '•'}
+                  </NativeText>
+                  <View style={{ flex: 1 }}>
+                    <FormattedInlineText
+                      html={itemHtml}
+                      baseStyle={[
+                        styles.articleText,
+                        {
+                          marginTop: 0,
+                          color: colors.text,
+                          fontSize: Math.round(18 * fontScale),
+                          lineHeight: Math.round(28 * fontScale),
+                        },
+                      ]}
+                      colors={colors}
+                      fontScale={fontScale}
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+          )
+        }
+
+        if (block.type === 'DIVIDER') {
+          return <View key={`div-${index}`} style={styles.divider} />
+        }
+
+        // Default: PARAGRAPH
+        return (
+          <View
+            key={`p-${index}`}
+            style={{
+              marginBottom: Math.round(16 * fontScale),
+            }}
+          >
+            <FormattedInlineText
+              html={block.rawHtml}
+              baseStyle={[
+                styles.articleText,
+                {
+                  marginTop: 0,
+                  color: colors.text,
+                  fontSize: Math.round(18 * fontScale),
+                  lineHeight: Math.round(30 * fontScale),
+                },
+              ]}
+              colors={colors}
+              fontScale={fontScale}
+            />
+          </View>
+        )
       })}
     </View>
   )
@@ -123,22 +511,32 @@ function BlockView({ block }: { block: ArticleBlock }) {
   const text = block.type === 'TEXT' ? stripHtml(block.html) : block.text || ''
   if (block.type === 'TEXT')
     return <TextBlockView html={block.html} />
-  if (block.type === 'HEADING')
+  if (block.type === 'HEADING') {
+    const isH3 = block.level === 'h3'
     return (
-      <NativeText
-        style={[
-          styles.blockHeading,
-          {
-            color: colors.text,
-            fontFamily: fontFor(text, 700),
-            fontSize: Math.round(21 * fontScale),
-            lineHeight: Math.round(29 * fontScale),
-          },
-        ]}
+      <View
+        style={{
+          marginTop: Math.round(22 * fontScale),
+          marginBottom: Math.round(10 * fontScale),
+        }}
       >
-        {text}
-      </NativeText>
+        <NativeText
+          style={[
+            styles.blockHeading,
+            {
+              marginTop: 0,
+              color: colors.text,
+              fontFamily: fontFor(text, 700),
+              fontSize: Math.round((isH3 ? 20 : 23) * fontScale),
+              lineHeight: Math.round((isH3 ? 28 : 32) * fontScale),
+            },
+          ]}
+        >
+          {text}
+        </NativeText>
+      </View>
     )
+  }
   if (block.type === 'QUOTE')
     return (
       <View style={[styles.quote, { backgroundColor: colors.primarySoft, borderLeftColor: colors.primary }]}>
@@ -163,7 +561,7 @@ function BlockView({ block }: { block: ArticleBlock }) {
       <View style={styles.blockImageWrap}>
         <View style={styles.blockImageBox}>
           <Image source={{ uri: mediaUrl(block.url) }} style={styles.blockImage} contentFit="cover" />
-          <ArticleWatermark />
+          <ArticleWatermark position="top-left" compact />
         </View>
         {block.caption ? (
           <Text style={[styles.blockImageCaption, { color: colors.textMuted }]}>{block.caption}</Text>
@@ -558,7 +956,7 @@ export default function NewsDetailScreen() {
               
               {!captionVisible && (
                 <>
-                  <ArticleWatermark />
+                  <ArticleWatermark position="top-left" compact />
                   <View style={styles.heroControls}>
                     <Pressable
                       style={styles.heroControlBtn}
@@ -638,7 +1036,7 @@ export default function NewsDetailScreen() {
             <BlockView key={block.id} block={block} />
           ))}
           {!item.bodyBlocks?.length && item.content ? (
-            <NativeText style={[styles.articleText, { color: themeColors.text, fontFamily: fontFor(item.content, 400), fontSize: Math.round(18 * fontScale), lineHeight: Math.round(30 * fontScale) }]}>{item.content}</NativeText>
+            <TextBlockView html={item.content} />
           ) : null}
 
           {item.tags?.length ? (

@@ -15,7 +15,7 @@ interface ArticleWatermarkProps {
 export const ArticleWatermark: React.FC<ArticleWatermarkProps> = ({
   compact = false,
   style,
-  position = 'bottom-left',
+  position = 'top-left',
 }) => {
   const positionStyle =
     position === 'bottom-left'
@@ -50,10 +50,10 @@ export const ArticleWatermark: React.FC<ArticleWatermarkProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    backgroundColor: 'rgba(15, 23, 42, 0.52)',
-    paddingHorizontal: 7,
-    paddingVertical: 3.5,
-    borderRadius: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.40)',
+    paddingHorizontal: 5,
+    paddingVertical: 2.5,
+    borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,
@@ -61,9 +61,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   containerCompact: {
-    paddingHorizontal: 5,
-    paddingVertical: 2.5,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
     borderRadius: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
   },
   posBottomLeft: {
     bottom: 8,
@@ -82,15 +83,15 @@ const styles = StyleSheet.create({
     right: 8,
   },
   logo: {
-    width: 60,
-    height: 30, // 2:1 aspect ratio matching splash-icon.png (1774 x 887)
+    width: 44,
+    height: 22, // 2:1 aspect ratio matching splash-icon.png (1774 x 887)
     tintColor: '#FFFFFF',
-    opacity: 0.92,
+    opacity: 0.88,
   },
   logoCompact: {
-    width: 44,
-    height: 22,
-    opacity: 0.88,
+    width: 36,
+    height: 18,
+    opacity: 0.82,
   },
 })
 
