@@ -166,7 +166,7 @@ function BlockView({ block }: { block: ArticleBlock }) {
           <ArticleWatermark />
         </View>
         {block.caption ? (
-          <NativeText style={[styles.blockImageCaption, { color: colors.textMuted }]}>{block.caption}</NativeText>
+          <Text style={[styles.blockImageCaption, { color: colors.textMuted }]}>{block.caption}</Text>
         ) : null}
       </View>
     ) : null
@@ -574,9 +574,9 @@ export default function NewsDetailScreen() {
 
               {captionVisible && (
                 <View style={styles.captionOverlay}>
-                  <Text style={[styles.captionText, { fontSize: Math.round(12.5 * fontScale), lineHeight: Math.round(17 * fontScale) }]}>
+                  <NativeText style={[styles.captionText, { fontSize: Math.round(12.5 * fontScale), lineHeight: Math.round(17 * fontScale) }]}>
                     {captionText}
-                  </Text>
+                  </NativeText>
                   <Pressable
                     style={styles.captionCloseBtn}
                     onPress={() => {

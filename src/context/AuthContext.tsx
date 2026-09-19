@@ -13,6 +13,7 @@ interface AuthContextValue {
   login: (identifier: string, password: string) => Promise<User>
   logout: () => Promise<void>
   refreshProfile: () => Promise<void>
+  setSession: (user: User, token: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -39,6 +40,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false)
       }
     })()
+  }, [])
+
+  const setSession = useCallback(async (newUser: User, token: string) => {
+    await setToken(token)
+    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(newUser))
+    setUser(newUser)
   }, [])
 
   const login = useCallback(async (identifier: string, password: string) => {
@@ -70,6 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         refreshProfile,
+        setSession,
       }}
     >
       {children}

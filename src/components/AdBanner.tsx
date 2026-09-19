@@ -10,7 +10,7 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
-import { WebView } from 'react-native-webview'
+import { AdWebView } from './AdWebView'
 import { colors, fonts, radius, spacing } from '../theme'
 import { useTheme } from '../context/ThemeContext'
 import { ScaledText as Text } from './ScaledText'
@@ -90,7 +90,7 @@ function ScriptAdRenderer({
   themeColors: any
 }) {
   const [webViewHeight, setWebViewHeight] = useState(100)
-  const webViewRef = useRef<WebView>(null)
+  const webViewRef = useRef<any>(null)
 
   const htmlSource = useMemo(() => {
     const bgColor = isDark ? '#1a1f26' : '#ffffff'
@@ -101,6 +101,7 @@ function ScriptAdRenderer({
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <base target="_blank" />
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       html, body {
@@ -134,6 +135,8 @@ function ScriptAdRenderer({
           var height = container ? container.scrollHeight : document.body.scrollHeight;
           if (window.ReactNativeWebView && height > 20) {
             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'AD_HEIGHT', height: height }));
+          } else if (window.parent && window.parent.postMessage && height > 20) {
+            window.parent.postMessage(JSON.stringify({ type: 'AD_HEIGHT', height: height }), '*');
           }
         } catch(e) {}
       }
@@ -148,10 +151,13 @@ function ScriptAdRenderer({
 
   const handleMessage = (event: any) => {
     try {
-      const data = JSON.parse(event.nativeEvent.data)
+      const raw = event?.nativeEvent?.data
+      const data = typeof raw === 'string' ? JSON.parse(raw) : raw
       if (data?.type === 'AD_HEIGHT' && typeof data.height === 'number') {
         const clampedHeight = Math.max(50, Math.min(Math.round(data.height) + 12, 340))
         setWebViewHeight(clampedHeight)
+      } else if (data?.type === 'AD_CLICK' && ad._id) {
+        advertisementApi.recordClick(ad._id)
       }
     } catch {
       // ignore
@@ -189,18 +195,12 @@ function ScriptAdRenderer({
           SPONSORED · {((ad.placements && ad.placements[0]) || ad.placement || 'ADVERTISEMENT').toUpperCase()}
         </Text>
       </View>
-      <WebView
+      <AdWebView
         ref={webViewRef}
-        source={{ html: htmlSource }}
+        html={htmlSource}
         style={{ flex: 1, backgroundColor: 'transparent' }}
-        scrollEnabled={false}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        originWhitelist={['*']}
         onMessage={handleMessage}
         onShouldStartLoadWithRequest={handleShouldStartLoad}
-        showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}
       />
     </View>
   )

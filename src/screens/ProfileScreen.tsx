@@ -158,10 +158,10 @@ export default function ProfileScreen({ navigation }: any) {
               {reporterPhoto ? (
                 <Image source={{ uri: mediaUrl(reporterPhoto) }} style={styles.avatarImg} contentFit="cover" />
               ) : (
-                <Text style={styles.avatarText}>{(user?.name || 'U').charAt(0)}</Text>
+                <Text style={styles.avatarText}>{(user?.name || user?.email || 'U').charAt(0).toUpperCase()}</Text>
               )}
             </View>
-            <Text style={[styles.name, { fontFamily: fontFor(user?.name, 700), color: colors.text }]}>{user?.name}</Text>
+            <Text style={[styles.name, { fontFamily: fontFor(user?.name, 700), color: colors.text }]}>{user?.name || 'User'}</Text>
 
             {isReporter && reporterProfile ? (
               <>
@@ -200,7 +200,23 @@ export default function ProfileScreen({ navigation }: any) {
               </>
             ) : (
               <>
-                <Text style={[styles.detail, { color: colors.textMuted }]}>{user?.email || user?.phone || 'Member'}</Text>
+                {user?.email ? (
+                  <View style={styles.profileLine}>
+                    <Ionicons name="mail-outline" size={14} color={colors.primary} />
+                    <Text style={[styles.profileLineText, { color: colors.textMuted }]} numberOfLines={1}>
+                      {user.email}
+                    </Text>
+                  </View>
+                ) : user?.phone ? (
+                  <View style={styles.profileLine}>
+                    <Ionicons name="call-outline" size={14} color={colors.primary} />
+                    <Text style={[styles.profileLineText, { color: colors.textMuted }]} numberOfLines={1}>
+                      {user.phone}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.detail, { color: colors.textMuted }]}>Member</Text>
+                )}
                 <View style={styles.roleRow}>
                   <View style={[styles.roleBadge, isReporter && styles.roleReporter]}>
                     <Text style={[styles.roleText, isReporter && styles.roleTextReporter]}>{user?.role || 'USER'}</Text>
@@ -213,10 +229,26 @@ export default function ProfileScreen({ navigation }: any) {
 
         <Text style={[styles.section, { color: colors.textMuted }]}>My Activity</Text>
         <View style={[styles.activityCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View><Text style={[styles.activityValue, { color: colors.text }]}>{activity.read}</Text><Text style={[styles.activityLabel, { color: colors.textMuted }]}>Read</Text></View>
-          <View><Text style={[styles.activityValue, { color: colors.text }]}>{activity.bookmarks}</Text><Text style={[styles.activityLabel, { color: colors.textMuted }]}>Saved</Text></View>
-          <View><Text style={[styles.activityValue, { color: colors.text }]}>{activity.favorites}</Text><Text style={[styles.activityLabel, { color: colors.textMuted }]}>Favorites</Text></View>
-          <View><Text style={[styles.activityValue, { color: colors.text }]}>{activity.likes}</Text><Text style={[styles.activityLabel, { color: colors.textMuted }]}>Liked</Text></View>
+          <View style={styles.activityItem}>
+            <Ionicons name="book-outline" size={18} color={colors.primary} style={styles.activityIcon} />
+            <Text style={[styles.activityValue, { color: colors.text }]}>{activity.read}</Text>
+            <Text style={[styles.activityLabel, { color: colors.textMuted }]}>Read</Text>
+          </View>
+          <View style={styles.activityItem}>
+            <Ionicons name="bookmark-outline" size={18} color={colors.primary} style={styles.activityIcon} />
+            <Text style={[styles.activityValue, { color: colors.text }]}>{activity.bookmarks}</Text>
+            <Text style={[styles.activityLabel, { color: colors.textMuted }]}>Saved</Text>
+          </View>
+          <View style={styles.activityItem}>
+            <Ionicons name="star-outline" size={18} color={colors.primary} style={styles.activityIcon} />
+            <Text style={[styles.activityValue, { color: colors.text }]}>{activity.favorites}</Text>
+            <Text style={[styles.activityLabel, { color: colors.textMuted }]}>Favorites</Text>
+          </View>
+          <View style={styles.activityItem}>
+            <Ionicons name="heart-outline" size={18} color={colors.primary} style={styles.activityIcon} />
+            <Text style={[styles.activityValue, { color: colors.text }]}>{activity.likes}</Text>
+            <Text style={[styles.activityLabel, { color: colors.textMuted }]}>Liked</Text>
+          </View>
         </View>
 
         <Text style={styles.section}>Personal activity</Text>
@@ -332,7 +364,9 @@ const styles = StyleSheet.create({
   locationValue: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 2 },
   section: { fontSize: 13, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginHorizontal: 16, marginTop: 22, marginBottom: 10 },
   card: { marginHorizontal: 16, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  activityCard: { flexDirection: 'row', justifyContent: 'space-around', marginHorizontal: 16, borderRadius: 14, borderWidth: 1, paddingVertical: 16 },
+  activityCard: { flexDirection: 'row', justifyContent: 'space-around', marginHorizontal: 16, borderRadius: 14, borderWidth: 1, paddingVertical: 14 },
+  activityItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  activityIcon: { marginBottom: 4 },
   activityValue: { fontSize: 18, fontWeight: '800', textAlign: 'center' },
   activityLabel: { fontSize: 11, textAlign: 'center', marginTop: 3 },
   menuRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },

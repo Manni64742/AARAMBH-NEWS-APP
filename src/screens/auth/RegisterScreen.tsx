@@ -12,24 +12,32 @@ import { colors } from '../../theme'
 export default function RegisterScreen({ navigation }: any) {
   const { colors: themeColors } = useTheme()
   const { error, success } = useToast()
-  const { login } = useAuth()
+  const { login, setSession } = useAuth()
   const [name, setName] = useState('')
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
 
   const submit = async () => {
-    if (!name.trim() || !identifier.trim() || password.length < 6) {
+    const trimmedName = name.trim()
+    const trimmedIdentifier = identifier.trim()
+    if (!trimmedName || !trimmedIdentifier || password.length < 6) {
       error('Fill all fields (password min 6 chars)')
       return
     }
     setBusy(true)
     try {
-      const res = await authApi.register({ name: name.trim(), identifier: identifier.trim(), password })
-      await setToken(res.data.tokens.accessToken)
-      await AsyncStorage.setItem('aarambh_user', JSON.stringify(res.data.user))
+      const res = await authApi.register({
+        name: trimmedName,
+        identifier: trimmedIdentifier,
+        password,
+      })
+      if (res?.data?.user && res?.data?.tokens?.accessToken) {
+        await setSession(res.data.user, res.data.tokens.accessToken)
+      } else {
+        await login(trimmedIdentifier, password).catch(() => null)
+      }
       success('Account created')
-      await login(identifier.trim(), password).catch(() => res.data.user)
       navigation.goBack()
     } catch (e) {
       error(errorMessage(e, 'Registration failed'))
@@ -42,7 +50,14 @@ export default function RegisterScreen({ navigation }: any) {
     <KeyboardAvoidingView style={[styles.flex, { backgroundColor: themeColors.background }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={[styles.label, { color: themeColors.text }]}>Full Name</Text>
-        <TextInput style={[styles.input, { backgroundColor: themeColors.card, borderColor: themeColors.border, color: themeColors.text }]} value={name} onChangeText={setName} placeholder="Your name" placeholderTextColor={themeColors.textLight} />
+        <TextInput
+          style={[styles.input, { backgroundColor: themeColors.card, borderColor: themeColors.border, color: themeColors.text }]}
+          value={name}
+          onChangeText={setName}
+          placeholder="Enter your full name"
+          placeholderTextColor={themeColors.textLight}
+          autoCapitalize="words"
+        />
 
         <Text style={[styles.label, { color: themeColors.text }]}>Email or Phone</Text>
         <TextInput
@@ -52,10 +67,18 @@ export default function RegisterScreen({ navigation }: any) {
           placeholder="you@example.com or 98XXXXXXXX"
           placeholderTextColor={themeColors.textLight}
           autoCapitalize="none"
+          keyboardType="email-address"
         />
 
         <Text style={[styles.label, { color: themeColors.text }]}>Password</Text>
-        <TextInput style={[styles.input, { backgroundColor: themeColors.card, borderColor: themeColors.border, color: themeColors.text }]} value={password} onChangeText={setPassword} placeholder="Min 6 characters" placeholderTextColor={themeColors.textLight} secureTextEntry />
+        <TextInput
+          style={[styles.input, { backgroundColor: themeColors.card, borderColor: themeColors.border, color: themeColors.text }]}
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Min 6 characters"
+          placeholderTextColor={themeColors.textLight}
+          secureTextEntry
+        />
 
         <Pressable style={[styles.button, busy && styles.buttonDisabled]} onPress={submit} disabled={busy}>
           <Text style={styles.buttonText}>{busy ? 'Creating...' : 'Create Account'}</Text>

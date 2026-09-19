@@ -6,7 +6,7 @@ const THEME_KEY = 'aarambh_theme'
 const FONT_MODE_KEY = 'aarambh_font_mode'
 
 export type FontMode = 'small' | 'medium' | 'large'
-const FONT_SCALES: Record<FontMode, number> = { small: 0.9, medium: 1.0, large: 1.15 }
+const FONT_SCALES: Record<FontMode, number> = { small: 0.88, medium: 1.0, large: 1.2 }
 
 const darkColors = {
   ...lightColors,
