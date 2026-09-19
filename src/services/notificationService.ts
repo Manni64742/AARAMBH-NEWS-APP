@@ -97,11 +97,218 @@ export async function setupNotificationChannel(): Promise<void> {
   }
 }
 
+export async function sendPushDebugLog(data: Record<string, any>): Promise<void> {
+  try {
+    await axios.post(
+      `${API_URL}/notifications/debug-log`,
+      {
+        ...data,
+        platform: Platform.OS,
+        clientTime: new Date().toISOString(),
+      },
+      { timeout: 8000 }
+    )
+  } catch {
+    // silently fail
+  }
+}
+
+export interface DiagnosticResult {
+  ok: boolean
+  step: string
+  permissionStatus: string
+  token: string | null
+  deviceId: string
+  serverRegistered: boolean
+  error?: string
+  appVersion: string
+}
+
+export async function runPushNotificationDiagnostic(): Promise<DiagnosticResult> {
+  const deviceId = await getOrCreateDeviceId()
+  const appVersion = Constants.expoConfig?.version || '1.0.1'
+  let step = 'init'
+  let permissionStatus = 'unknown'
+  let token: string | null = null
+  let serverRegistered = false
+  let errorMsg = ''
+
+  try {
+    step = 'setupChannel'
+    await setupNotificationChannel()
+
+    step = 'checkPermission'
+    const perm = await Notifications.getPermissionsAsync()
+    permissionStatus = perm.status
+    if (perm.status !== 'granted') {
+      const req = await Notifications.requestPermissionsAsync()
+      permissionStatus = req.status
+    }
+
+    if (permissionStatus !== 'granted') {
+      await sendPushDebugLog({ step: 'DIAGNOSTIC_PERMISSION_DENIED', permissionStatus, deviceId, appVersion })
+      return {
+        ok: false,
+        step: 'permission',
+        permissionStatus,
+        token: null,
+        deviceId,
+        serverRegistered: false,
+        error: `Permission is ${permissionStatus}. Device notification setting is disabled.`,
+        appVersion,
+      }
+    }
+
+    step = 'fetchExpoToken'
+    const effectiveProjectId = EAS_PROJECT_ID || '980071c6-0de9-4ea3-bfa9-c837696a6d7d'
+    try {
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: effectiveProjectId,
+      })
+      token = tokenData.data
+      await AsyncStorage.setItem(PUSH_TOKEN_KEY, token)
+    } catch (tokenErr: any) {
+      errorMsg = tokenErr?.message || String(tokenErr)
+      await sendPushDebugLog({
+        step: 'DIAGNOSTIC_TOKEN_ERROR',
+        error: errorMsg,
+        deviceId,
+        appVersion,
+      })
+      return {
+        ok: false,
+        step: 'fetchExpoToken',
+        permissionStatus,
+        token: null,
+        deviceId,
+        serverRegistered: false,
+        error: `Expo token error: ${errorMsg}`,
+        appVersion,
+      }
+    }
+
+    step = 'registerWithServer'
+    if (token) {
+      let userState: string | undefined
+      let userCity: string | undefined
+      let userInterests: string[] = []
+
+      try {
+        const rawLoc = await AsyncStorage.getItem('aarambh_location')
+        if (rawLoc) {
+          const parsed = JSON.parse(rawLoc)
+          userState = parsed.state || parsed.label
+          userCity = parsed.city || parsed.district
+        }
+        const rawInterests = await AsyncStorage.getItem('aarambh_guest_interests')
+        if (rawInterests) {
+          userInterests = JSON.parse(rawInterests)
+        }
+      } catch {}
+
+      try {
+        const resp = await axios.post(
+          `${API_URL}/notifications/push-token`,
+          {
+            token,
+            deviceId,
+            platform: Platform.OS,
+            language: 'hi',
+            state: userState,
+            city: userCity,
+            interests: userInterests,
+          },
+          { timeout: 15000 }
+        )
+        serverRegistered = Boolean(resp.data?.success)
+        await sendPushDebugLog({
+          step: 'DIAGNOSTIC_REGISTER_SUCCESS',
+          token,
+          deviceId,
+          appVersion,
+        })
+      } catch (apiErr: any) {
+        errorMsg = apiErr?.response?.data?.message || apiErr?.message || String(apiErr)
+        await sendPushDebugLog({
+          step: 'DIAGNOSTIC_REGISTER_FAIL',
+          error: errorMsg,
+          token,
+          deviceId,
+          appVersion,
+        })
+      }
+    }
+
+    return {
+      ok: Boolean(token && serverRegistered),
+      step: 'completed',
+      permissionStatus,
+      token,
+      deviceId,
+      serverRegistered,
+      error: errorMsg || undefined,
+      appVersion,
+    }
+  } catch (err: any) {
+    const errText = err?.message || String(err)
+    await sendPushDebugLog({
+      step: 'DIAGNOSTIC_FATAL',
+      failedStep: step,
+      error: errText,
+      deviceId,
+      appVersion,
+    })
+    return {
+      ok: false,
+      step,
+      permissionStatus,
+      token,
+      deviceId,
+      serverRegistered: false,
+      error: `Diagnostic error at ${step}: ${errText}`,
+      appVersion,
+    }
+  }
+}
+
+export async function sendTestPushNotification(customToken?: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const token = customToken || (await AsyncStorage.getItem(PUSH_TOKEN_KEY))
+    const deviceId = await getOrCreateDeviceId()
+
+    // Show immediate local notification on device
+    await showLocalSystemNotification(
+      'Aarambh News Live Push Test',
+      'बधाई हो! आपकी पुश नोटिफिकेशन सफलतापूर्वक काम कर रही है।'
+    )
+
+    const resp = await axios.post(
+      `${API_URL}/notifications/test-push`,
+      { token, deviceId },
+      { timeout: 15000 }
+    )
+
+    return {
+      success: true,
+      message: resp.data?.message || 'Test push sent successfully!',
+    }
+  } catch (err: any) {
+    const msg = err?.response?.data?.message || err?.message || 'Failed to send test push'
+    return {
+      success: false,
+      message: msg,
+    }
+  }
+}
+
 /**
  * Request notification permissions and register the device's push token with the backend,
  * including user's selected location and interests for targeted delivery.
  */
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
+  const deviceId = await getOrCreateDeviceId()
+  const appVersion = Constants.expoConfig?.version || '1.0.1'
+
   try {
     await setupNotificationChannel()
 
@@ -111,6 +318,14 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       const { status } = await Notifications.requestPermissionsAsync()
       finalStatus = status
     }
+
+    await sendPushDebugLog({
+      step: 'PERMISSION_EVALUATED',
+      existingStatus,
+      finalStatus,
+      deviceId,
+      appVersion,
+    })
 
     if (finalStatus !== 'granted') {
       console.log('[Notification] Notification permission not granted by user.')
@@ -127,11 +342,23 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       })
       token = tokenData.data
       console.log('[Notification] Successfully acquired Expo Push Token:', token)
+      await sendPushDebugLog({
+        step: 'TOKEN_FETCH_SUCCESS',
+        token,
+        deviceId,
+        appVersion,
+      })
     } catch (pushErr: any) {
-      console.error('[Notification] Expo push token fetch error:', pushErr?.message || pushErr)
+      const pushErrMsg = pushErr?.message || String(pushErr)
+      console.error('[Notification] Expo push token fetch error:', pushErrMsg)
+      await sendPushDebugLog({
+        step: 'TOKEN_FETCH_ERROR',
+        error: pushErrMsg,
+        stack: pushErr?.stack,
+        deviceId,
+        appVersion,
+      })
     }
-
-    const deviceId = await getOrCreateDeviceId()
 
     // Read user's selected location & interests from storage
     let userState: string | undefined
@@ -171,14 +398,35 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
           { timeout: 15000 }
         )
         console.log('[Notification] Device push token registered with server response:', resp.data?.success)
+        await sendPushDebugLog({
+          step: 'SERVER_REGISTER_SUCCESS',
+          token,
+          deviceId,
+          appVersion,
+        })
       } catch (err: any) {
-        console.error('[Notification] Could not register token with server:', err?.message || err)
+        const apiErrMsg = err?.response?.data || err?.message || String(err)
+        console.error('[Notification] Could not register token with server:', apiErrMsg)
+        await sendPushDebugLog({
+          step: 'SERVER_REGISTER_ERROR',
+          error: apiErrMsg,
+          token,
+          deviceId,
+          appVersion,
+        })
       }
     }
 
     return token
-  } catch (error) {
-    console.error('[Notification] registerForPushNotificationsAsync fatal error:', error)
+  } catch (error: any) {
+    const fatalMsg = error?.message || String(error)
+    console.error('[Notification] registerForPushNotificationsAsync fatal error:', fatalMsg)
+    await sendPushDebugLog({
+      step: 'REGISTER_FATAL_ERROR',
+      error: fatalMsg,
+      deviceId,
+      appVersion,
+    })
     return null
   }
 }
