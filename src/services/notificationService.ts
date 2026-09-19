@@ -114,7 +114,7 @@ export interface DiagnosticResult {
 
 export async function runPushNotificationDiagnostic(): Promise<DiagnosticResult> {
   const deviceId = await getOrCreateDeviceId()
-  const appVersion = Constants.expoConfig?.version || '1.0.2'
+  const appVersion = Constants.expoConfig?.version || '1.0.3'
   let step = 'init'
   let permissionStatus = 'unknown'
   let token: string | null = null
@@ -328,7 +328,7 @@ export function registerForPushNotificationsAsync(): Promise<string | null> {
 
 async function executePushRegistration(): Promise<string | null> {
   const deviceId = await getOrCreateDeviceId()
-  const appVersion = Constants.expoConfig?.version || '1.0.2'
+  const appVersion = Constants.expoConfig?.version || '1.0.3'
 
   let deviceModel: string | undefined
   let osVersion: string | undefined

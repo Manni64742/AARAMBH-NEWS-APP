@@ -241,7 +241,7 @@ export default function SettingsScreen({ navigation }: any) {
       ) : null}
 
       <Text style={{ textAlign: 'center', fontSize: 12, color: colors.textLight, marginTop: 24, marginBottom: 12 }}>
-        Aarambh News • v{Constants.expoConfig?.version || '1.0.2'} (Build #{Constants.expoConfig?.android?.versionCode || 3})
+        Aarambh News • v{Constants.expoConfig?.version || '1.0.3'} (Build #{Constants.expoConfig?.android?.versionCode || 4})
       </Text>
     </ScrollView>
   )
