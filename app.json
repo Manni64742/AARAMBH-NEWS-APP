@@ -36,11 +36,16 @@
       },
       "predictiveBackGestureEnabled": false
     },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#FF2E00"
+    },
     "web": {
       "favicon": "./assets/aarambh_news_mobicon.png"
     },
     "plugins": [
       "./plugins/with-gradle-download-timeout",
+      "./plugins/with-notification-large-icon",
       [
         "expo-splash-screen",
         {

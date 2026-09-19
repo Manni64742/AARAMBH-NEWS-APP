@@ -97,20 +97,8 @@ export async function setupNotificationChannel(): Promise<void> {
   }
 }
 
-export async function sendPushDebugLog(data: Record<string, any>): Promise<void> {
-  try {
-    await axios.post(
-      `${API_URL}/notifications/debug-log`,
-      {
-        ...data,
-        platform: Platform.OS,
-        clientTime: new Date().toISOString(),
-      },
-      { timeout: 8000 }
-    )
-  } catch {
-    // silently fail
-  }
+export async function sendPushDebugLog(_data: Record<string, any>): Promise<void> {
+  // Silent in production to prevent unnecessary network traffic
 }
 
 export interface DiagnosticResult {
@@ -356,14 +344,6 @@ async function executePushRegistration(): Promise<string | null> {
       }
     }
 
-    await sendPushDebugLog({
-      step: 'PERMISSION_EVALUATED',
-      existingStatus,
-      finalStatus,
-      deviceId,
-      appVersion,
-    })
-
     if (finalStatus !== 'granted') {
       console.log('[Notification] Notification permission not granted by user.')
       return null
@@ -382,13 +362,6 @@ async function executePushRegistration(): Promise<string | null> {
         token = tokenData.data
         if (token) {
           console.log('[Notification] Successfully acquired Expo Push Token:', token)
-          await sendPushDebugLog({
-            step: 'TOKEN_FETCH_SUCCESS',
-            token,
-            attempt,
-            deviceId,
-            appVersion,
-          })
           break
         }
       } catch (pushErr: any) {
@@ -414,13 +387,6 @@ async function executePushRegistration(): Promise<string | null> {
     if (!token && lastPushError) {
       const pushErrMsg = lastPushError?.message || String(lastPushError)
       console.error('[Notification] Expo push token fetch error after retries:', pushErrMsg)
-      await sendPushDebugLog({
-        step: 'TOKEN_FETCH_ERROR',
-        error: pushErrMsg,
-        stack: lastPushError?.stack,
-        deviceId,
-        appVersion,
-      })
     }
 
     // Read user's selected location & interests from storage
@@ -445,6 +411,21 @@ async function executePushRegistration(): Promise<string | null> {
 
     if (token) {
       await AsyncStorage.setItem(PUSH_TOKEN_KEY, token)
+
+      // Deduplication: Avoid redundant network requests if recently synced with identical config
+      const lastSyncKey = 'aarambh_last_token_sync'
+      const payloadSignature = `${token}:${userState || ''}:${userCity || ''}:${userInterests.sort().join(',')}`
+      const lastSyncRaw = await AsyncStorage.getItem(lastSyncKey).catch(() => null)
+      if (lastSyncRaw) {
+        try {
+          const { signature, timestamp } = JSON.parse(lastSyncRaw)
+          if (signature === payloadSignature && Date.now() - timestamp < 6 * 60 * 60 * 1000) {
+            console.log('[Notification] Push token already synced with backend recently. Skipping network POST.')
+            return token
+          }
+        } catch {}
+      }
+
       // Register with Aarambh News backend
       try {
         const resp = await axios.post(
@@ -457,26 +438,20 @@ async function executePushRegistration(): Promise<string | null> {
             state: userState,
             city: userCity,
             interests: userInterests,
+            appVersion,
           },
           { timeout: 15000 }
         )
+        if (resp.data?.success) {
+          await AsyncStorage.setItem(
+            lastSyncKey,
+            JSON.stringify({ signature: payloadSignature, timestamp: Date.now() })
+          )
+        }
         console.log('[Notification] Device push token registered with server response:', resp.data?.success)
-        await sendPushDebugLog({
-          step: 'SERVER_REGISTER_SUCCESS',
-          token,
-          deviceId,
-          appVersion,
-        })
       } catch (err: any) {
         const apiErrMsg = err?.response?.data || err?.message || String(err)
         console.error('[Notification] Could not register token with server:', apiErrMsg)
-        await sendPushDebugLog({
-          step: 'SERVER_REGISTER_ERROR',
-          error: apiErrMsg,
-          token,
-          deviceId,
-          appVersion,
-        })
       }
     }
 
@@ -484,12 +459,6 @@ async function executePushRegistration(): Promise<string | null> {
   } catch (error: any) {
     const fatalMsg = error?.message || String(error)
     console.error('[Notification] registerForPushNotificationsAsync fatal error:', fatalMsg)
-    await sendPushDebugLog({
-      step: 'REGISTER_FATAL_ERROR',
-      error: fatalMsg,
-      deviceId,
-      appVersion,
-    })
     return null
   }
 }
