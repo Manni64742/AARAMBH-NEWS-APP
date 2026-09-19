@@ -89,16 +89,16 @@ export const NewsCardSkeleton: React.FC<{ style?: any }> = ({ style }) => {
           <Skeleton width="96%" height={15} radius={radius.sm} style={{ marginBottom: 6 }} />
           <Skeleton width="78%" height={15} radius={radius.sm} style={{ marginBottom: 8 }} />
           {/* Summary line */}
-          <Skeleton width="88%" height={11} radius={radius.xs} style={{ marginBottom: 10 }} />
+          <Skeleton width="88%" height={11} radius={3} style={{ marginBottom: 10 }} />
         </View>
         {/* Meta row */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Skeleton width={64} height={10} radius={radius.xs} />
+            <Skeleton width={64} height={10} radius={3} />
             <Skeleton width={4} height={4} radius={2} />
-            <Skeleton width={38} height={10} radius={radius.xs} />
+            <Skeleton width={38} height={10} radius={3} />
           </View>
-          <Skeleton width={32} height={10} radius={radius.xs} />
+          <Skeleton width={32} height={10} radius={3} />
         </View>
       </View>
       {/* 90x90 Thumbnail */}
@@ -136,7 +136,7 @@ export const BreakingTickerSkeleton: React.FC = () => {
       }}
     >
       <Skeleton width={52} height={22} radius={radius.sm} />
-      <Skeleton width="68%" height={12} radius={radius.xs} />
+      <Skeleton width="68%" height={12} radius={3} />
     </View>
   )
 }
@@ -166,7 +166,7 @@ export const NewsSliderSkeleton: React.FC<{ title?: string }> = ({ title = 'Head
           <Skeleton width={110} height={18} radius={radius.sm} />
           <Skeleton width={54} height={18} radius={radius.pill} />
         </View>
-        <Skeleton width={24} height={14} radius={radius.xs} />
+        <Skeleton width={24} height={14} radius={3} />
       </View>
 
       {/* Main Big Hero Card */}
@@ -201,7 +201,7 @@ export const NewsSliderSkeleton: React.FC<{ title?: string }> = ({ title = 'Head
         <View style={{ padding: spacing.md }}>
           <Skeleton width="94%" height={16} radius={radius.sm} style={{ marginBottom: 6 }} />
           <Skeleton width="72%" height={16} radius={radius.sm} style={{ marginBottom: 8 }} />
-          <Skeleton width="86%" height={12} radius={radius.xs} />
+          <Skeleton width="86%" height={12} radius={3} />
         </View>
       </View>
 
@@ -273,7 +273,7 @@ export const BundleCardSkeleton: React.FC<{ title?: string }> = ({ title }) => {
           }}
         >
           <Skeleton width={88} height={16} radius={radius.sm} />
-          <Skeleton width={64} height={14} radius={radius.xs} />
+          <Skeleton width={64} height={14} radius={3} />
         </View>
 
         {/* 3 News Rows */}
@@ -290,9 +290,9 @@ export const BundleCardSkeleton: React.FC<{ title?: string }> = ({ title }) => {
             }}
           >
             <View style={{ flex: 1, paddingRight: 10 }}>
-              <Skeleton width={48} height={16} radius={radius.xs} style={{ marginBottom: 6 }} />
-              <Skeleton width="92%" height={13} radius={radius.xs} style={{ marginBottom: 4 }} />
-              <Skeleton width="68%" height={13} radius={radius.xs} />
+              <Skeleton width={48} height={16} radius={3} style={{ marginBottom: 6 }} />
+              <Skeleton width="92%" height={13} radius={3} style={{ marginBottom: 4 }} />
+              <Skeleton width="68%" height={13} radius={3} />
             </View>
             <Skeleton width={60} height={60} radius={radius.sm} />
           </View>
