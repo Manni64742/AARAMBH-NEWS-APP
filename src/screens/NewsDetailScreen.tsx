@@ -82,6 +82,39 @@ const stripHtml = (html = '') => {
     .trim()
 }
 
+const cleanHtmlForMobile = (html = '') => {
+  if (!html) return ''
+  let cleaned = decodeHtmlEntities(html)
+  // Strip scripts, styles, comments, noscripts, svgs, forms
+  cleaned = cleaned
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
+    .replace(/<svg[\s\S]*?<\/svg>/gi, '')
+    .replace(/<form[\s\S]*?<\/form>/gi, '')
+
+  // Completely eliminate known website junk tags (ez-toc-section, table-of-contents, sharedaddy, ads)
+  cleaned = cleaned
+    .replace(/<span\b[^>]*\b(?:ez-toc|table-of-contents|sharedaddy|ad-)[^>]*>[\s\S]*?<\/span>/gi, '')
+    .replace(/<span\b[^>]*\b(?:ez-toc|table-of-contents|sharedaddy|ad-)[^>]*\/>/gi, '')
+    .replace(/<div\b[^>]*\b(?:ez-toc|table-of-contents|sharedaddy|ad-)[^>]*>[\s\S]*?<\/div>/gi, '')
+
+  // Convert styled spans to semantic tags
+  cleaned = cleaned
+    .replace(/<span\b[^>]*\bstyle\s*=\s*["'][^"']*\bfont-weight\s*:\s*(?:bold|[6-9]00)[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi, '<strong>$1</strong>')
+    .replace(/<span\b[^>]*\bstyle\s*=\s*["'][^"']*\bfont-style\s*:\s*italic[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi, '<em>$1</em>')
+    .replace(/<span\b[^>]*\bstyle\s*=\s*["'][^"']*\btext-decoration\s*:\s*underline[^"']*["'][^>]*>([\s\S]*?)<\/span>/gi, '<u>$1</u>')
+
+  // Remove empty spans
+  cleaned = cleaned.replace(/<span\b[^>]*>\s*<\/span>/gi, '')
+
+  // Unwrap any remaining spans so raw <span ...> never appears
+  cleaned = cleaned.replace(/<\/?span\b[^>]*>/gi, '')
+
+  return cleaned
+}
+
 const inlineImageSource = (tag: string) => {
   const match = tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)
   return match?.[1] ? mediaUrl(match[1]) : null
@@ -97,8 +130,12 @@ interface InlineSegment {
 
 function parseInlineFormatting(htmlString: string): InlineSegment[] {
   if (!htmlString) return []
-  const tagRegex = /(<\/?(?:b|strong|i|em|u|a|code|mark|br)\b[^>]*>)/gi
-  const tokens = htmlString.split(tagRegex)
+  const preCleaned = cleanHtmlForMobile(htmlString)
+  if (!preCleaned) return []
+
+  // Split by ALL HTML tags so every tag is an isolated token and never treated as text
+  const tagRegex = /(<\/?[a-z0-9]+(?:\s+[^>]*)?>)/gi
+  const tokens = preCleaned.split(tagRegex)
   const segments: InlineSegment[] = []
 
   let boldDepth = 0
@@ -157,7 +194,8 @@ function parseInlineFormatting(htmlString: string): InlineSegment[] {
       continue
     }
 
-    if (/^<[^>]+>$/.test(token)) {
+    // Crucial: ANY other HTML tag (span, div, p, unknown) is skipped and NEVER treated as text!
+    if (/^<[^>]+>$/i.test(token)) {
       continue
     }
 
@@ -232,8 +270,10 @@ interface ArticleContentBlock {
 
 function parseHtmlToBlocks(rawHtml: string): ArticleContentBlock[] {
   if (!rawHtml) return []
+  const preCleaned = cleanHtmlForMobile(rawHtml)
+  if (!preCleaned) return []
 
-  const imgParts = rawHtml.split(/(<img\b[^>]*>)/gi)
+  const imgParts = preCleaned.split(/(<img\b[^>]*>)/gi)
   const blocks: ArticleContentBlock[] = []
 
   for (const part of imgParts) {
