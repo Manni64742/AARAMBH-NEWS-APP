@@ -11,6 +11,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
 import { errorMessage } from '../../api/client'
 import { mediaUrl } from '../../config'
+import { AdaptiveImage } from '../AdaptiveImage'
 
 const TOOLBAR_BLOCKS: Array<{ type: ArticleBlockType; label: string; icon: any }> = [
   { type: 'TEXT', label: 'PARAGRAPH', icon: 'document-text-outline' },
@@ -19,6 +20,7 @@ const TOOLBAR_BLOCKS: Array<{ type: ArticleBlockType; label: string; icon: any }
   { type: 'IMAGE', label: 'IMAGE', icon: 'image-outline' },
   { type: 'VIDEO', label: 'VIDEO', icon: 'videocam-outline' },
   { type: 'YOUTUBE', label: 'YOUTUBE', icon: 'logo-youtube' },
+  { type: 'TABLE', label: 'TABLE', icon: 'grid-outline' },
   { type: 'DIVIDER', label: 'DIVIDER', icon: 'remove-outline' },
 ]
 
@@ -28,6 +30,19 @@ const newBlock = (type: ArticleBlockType): ArticleBlock => ({
   ...(type === 'TEXT' ? { html: '' } : {}),
   ...(type === 'HEADING' ? { level: 'h2', text: '' } : {}),
   ...(type === 'GALLERY' ? { items: [] } : {}),
+  ...(type === 'TABLE'
+    ? {
+        tableData: {
+          hasHeader: true,
+          headers: ['Column 1', 'Column 2', 'Column 3'],
+          rows: [
+            ['Data 1', 'Data 2', 'Data 3'],
+            ['Data 4', 'Data 5', 'Data 6'],
+          ],
+          caption: '',
+        },
+      }
+    : {}),
 })
 
 function VideoThumb({ url }: { url: string }) {
@@ -215,7 +230,7 @@ export default function ArticleBlockEditor({
             {mediaRow(index, block.type, (url) => updateBlock(index, { url }))}
             {block.url ? (
               block.type === 'IMAGE' ? (
-                <Image source={{ uri: mediaUrl(block.url) }} style={styles.mediaPreview} contentFit="cover" />
+                <AdaptiveImage source={{ uri: mediaUrl(block.url) || '' }} maxHeight={320} minHeight={180} borderRadius={8} />
               ) : (
                 <VideoThumb url={block.url} />
               )
@@ -256,6 +271,159 @@ export default function ArticleBlockEditor({
             <Text style={[styles.dividerText, { color: colors.textMuted }]}>—— Section Separator ——</Text>
           </View>
         )
+      case 'TABLE': {
+        const table = block.tableData || {
+          hasHeader: true,
+          headers: ['Column 1', 'Column 2', 'Column 3'],
+          rows: [
+            ['Data 1', 'Data 2', 'Data 3'],
+            ['Data 4', 'Data 5', 'Data 6'],
+          ],
+          caption: '',
+        }
+        const colCount = Math.max(
+          table.headers?.length || 0,
+          ...table.rows.map((r) => r.length),
+          1
+        )
+        const headers = table.headers || Array.from({ length: colCount }, (_, i) => `Col ${i + 1}`)
+
+        const updateCell = (rowIndex: number, colIndex: number, value: string) => {
+          const newRows = table.rows.map((row, rIdx) => {
+            if (rIdx !== rowIndex) return row
+            const newRow = [...row]
+            while (newRow.length <= colIndex) newRow.push('')
+            newRow[colIndex] = value
+            return newRow
+          })
+          updateBlock(index, { tableData: { ...table, rows: newRows } })
+        }
+
+        const updateHeader = (colIndex: number, value: string) => {
+          const newHeaders = [...headers]
+          while (newHeaders.length <= colIndex) newHeaders.push('')
+          newHeaders[colIndex] = value
+          updateBlock(index, { tableData: { ...table, headers: newHeaders } })
+        }
+
+        const addRow = () => {
+          const newRow = Array(colCount).fill('')
+          updateBlock(index, { tableData: { ...table, rows: [...table.rows, newRow] } })
+        }
+
+        const removeRow = () => {
+          if (table.rows.length <= 1) return
+          updateBlock(index, { tableData: { ...table, rows: table.rows.slice(0, -1) } })
+        }
+
+        const addCol = () => {
+          const newHeaders = [...headers, `Col ${colCount + 1}`]
+          const newRows = table.rows.map((row) => [...row, ''])
+          updateBlock(index, { tableData: { ...table, headers: newHeaders, rows: newRows } })
+        }
+
+        const removeCol = () => {
+          if (colCount <= 1) return
+          const newHeaders = headers.slice(0, -1)
+          const newRows = table.rows.map((row) => row.slice(0, -1))
+          updateBlock(index, { tableData: { ...table, headers: newHeaders, rows: newRows } })
+        }
+
+        return (
+          <View style={styles.tableEditorContainer}>
+            {/* Caption Input */}
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text, marginBottom: 8 }]}
+              value={table.caption || ''}
+              onChangeText={(v) => updateBlock(index, { tableData: { ...table, caption: v } })}
+              placeholder="Table title / caption (optional)"
+              placeholderTextColor={colors.textLight}
+            />
+
+            {/* Quick Action Controls */}
+            <View style={styles.tableControlsRow}>
+              <Pressable
+                style={[
+                  styles.tableControlBtn,
+                  { backgroundColor: table.hasHeader !== false ? colors.primary : colors.surfaceContainer },
+                ]}
+                onPress={() => updateBlock(index, { tableData: { ...table, hasHeader: table.hasHeader === false } })}
+              >
+                <Ionicons name="text-outline" size={13} color={table.hasHeader !== false ? '#fff' : colors.textMuted} />
+                <Text style={[styles.tableControlText, { color: table.hasHeader !== false ? '#fff' : colors.textMuted }]}>
+                  {table.hasHeader !== false ? 'Header ON' : 'Header OFF'}
+                </Text>
+              </Pressable>
+
+              <View style={styles.tableActionGroup}>
+                <Pressable style={[styles.tableMiniBtn, { backgroundColor: colors.surfaceContainer, borderColor: colors.border }]} onPress={addCol}>
+                  <Ionicons name="add" size={13} color={colors.primary} />
+                  <Text style={[styles.tableMiniBtnText, { color: colors.text }]}>Col</Text>
+                </Pressable>
+                {colCount > 1 && (
+                  <Pressable style={[styles.tableMiniBtn, { backgroundColor: colors.surfaceContainer, borderColor: colors.border }]} onPress={removeCol}>
+                    <Ionicons name="remove" size={13} color={colors.danger} />
+                    <Text style={[styles.tableMiniBtnText, { color: colors.danger }]}>Col</Text>
+                  </Pressable>
+                )}
+                <Pressable style={[styles.tableMiniBtn, { backgroundColor: colors.surfaceContainer, borderColor: colors.border }]} onPress={addRow}>
+                  <Ionicons name="add" size={13} color={colors.primary} />
+                  <Text style={[styles.tableMiniBtnText, { color: colors.text }]}>Row</Text>
+                </Pressable>
+                {table.rows.length > 1 && (
+                  <Pressable style={[styles.tableMiniBtn, { backgroundColor: colors.surfaceContainer, borderColor: colors.border }]} onPress={removeRow}>
+                    <Ionicons name="remove" size={13} color={colors.danger} />
+                    <Text style={[styles.tableMiniBtnText, { color: colors.danger }]}>Row</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+
+            {/* Horizontally Scrollable Table Grid */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.tableScroll}>
+              <View style={[styles.tableGrid, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                {table.hasHeader !== false && (
+                  <View style={[styles.tableHeaderRow, { backgroundColor: colors.surfaceContainer, borderBottomColor: colors.border }]}>
+                    <View style={[styles.tableIndexCell, { borderRightColor: colors.border }]}>
+                      <Text style={[styles.tableIndexText, { color: colors.textLight }]}>#</Text>
+                    </View>
+                    {headers.map((h, cIdx) => (
+                      <View key={cIdx} style={[styles.tableCellWrap, { borderRightColor: colors.border }]}>
+                        <TextInput
+                          style={[styles.tableHeaderInput, { color: colors.text }]}
+                          value={h}
+                          onChangeText={(v) => updateHeader(cIdx, v)}
+                          placeholder={`Header ${cIdx + 1}`}
+                          placeholderTextColor={colors.textLight}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {table.rows.map((row, rIdx) => (
+                  <View key={rIdx} style={[styles.tableRow, { borderBottomColor: colors.border }, rIdx % 2 === 1 && { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' }]}>
+                    <View style={[styles.tableIndexCell, { borderRightColor: colors.border }]}>
+                      <Text style={[styles.tableIndexText, { color: colors.textLight }]}>{rIdx + 1}</Text>
+                    </View>
+                    {Array.from({ length: colCount }).map((_, cIdx) => (
+                      <View key={cIdx} style={[styles.tableCellWrap, { borderRightColor: colors.border }]}>
+                        <TextInput
+                          style={[styles.tableCellInput, { color: colors.text }]}
+                          value={row[cIdx] || ''}
+                          onChangeText={(v) => updateCell(rIdx, cIdx, v)}
+                          placeholder="Cell data"
+                          placeholderTextColor={colors.textLight}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )
+      }
       default:
         return null
     }
@@ -691,4 +859,88 @@ const styles = StyleSheet.create({
   sheetThumb: { width: 50, height: 38, borderRadius: 6, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   sheetThumbImg: { width: '100%', height: '100%' },
   sheetName: { flex: 1, fontSize: 13, fontWeight: '600' },
+  tableEditorContainer: {
+    marginTop: 4,
+  },
+  tableControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  tableControlBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  tableControlText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  tableActionGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  tableMiniBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  tableMiniBtnText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
+  tableScroll: {
+    maxHeight: 280,
+  },
+  tableGrid: {
+    borderWidth: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  tableIndexCell: {
+    width: 28,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: 1,
+  },
+  tableIndexText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  tableCellWrap: {
+    width: 110,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRightWidth: 1,
+    justifyContent: 'center',
+  },
+  tableHeaderInput: {
+    fontSize: 12,
+    fontWeight: '700',
+    padding: 2,
+  },
+  tableCellInput: {
+    fontSize: 12,
+    padding: 2,
+  },
 })

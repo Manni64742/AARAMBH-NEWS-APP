@@ -34,6 +34,7 @@ import { colors as defaultColors, fonts } from '../../theme'
 import { useTheme } from '../../context/ThemeContext'
 import ArticleBlockEditor from '../../components/reporter/ArticleBlockEditor'
 import { ArticleWatermark } from '../../components/ArticleWatermark'
+import { AdaptiveImage } from '../../components/AdaptiveImage'
 
 const TYPES: Array<{ key: ContentType; label: string }> = [
   { key: 'ARTICLE', label: 'Article' },
@@ -86,7 +87,7 @@ const VISIBLE_SUB_CATEGORY_LIMIT = 10
 
 export default function SubmitNewsScreen({ navigation, route }: any) {
   const { success, error } = useToast()
-  const { colors } = useTheme()
+  const { colors, isDark } = useTheme()
   const { current: gpsLocation } = useLocation()
   const { user } = useAuth()
   const editing = !!(route?.params?.item)
@@ -274,6 +275,22 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
     setBusy(true)
     try {
       const bodyBlocks = blocks.map((b) => ({ ...b }))
+      const contentFallback = bodyBlocks
+        .map((b) => {
+          if (b.type === 'TEXT') return b.html || ''
+          if (b.type === 'HEADING' || b.type === 'QUOTE') return b.text || ''
+          if (b.type === 'TABLE' && b.tableData) {
+            const parts: string[] = []
+            if (b.tableData.caption) parts.push(b.tableData.caption)
+            if (b.tableData.headers) parts.push(b.tableData.headers.join(' | '))
+            if (b.tableData.rows) b.tableData.rows.forEach((r) => parts.push(r.join(' | ')))
+            return parts.join('\n')
+          }
+          return b.title || b.caption || ''
+        })
+        .filter(Boolean)
+        .join('\n\n')
+
       const determinedScope =
         loc.district ? 'DISTRICT' : loc.state ? 'STATE' : scope || 'NATIONAL'
 
@@ -284,6 +301,7 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
       const payload: Record<string, any> = {
         title: title.trim(),
         summary: summary.trim() || undefined,
+        content: contentFallback || undefined,
         bodyBlocks,
         featuredImage: featuredImage || null,
         contentType,
@@ -1214,9 +1232,15 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
 
             {/* Cover Image */}
             {featuredImage?.url ? (
-              <View style={styles.previewImgWrap}>
-                <Image source={{ uri: mediaUrl(featuredImage.url) }} style={styles.previewCoverImg} resizeMode="cover" />
-                <ArticleWatermark />
+              <View style={{ marginVertical: 10 }}>
+                <AdaptiveImage
+                  source={{ uri: mediaUrl(featuredImage.url) || '' }}
+                  maxHeight={480}
+                  minHeight={200}
+                  borderRadius={10}
+                >
+                  <ArticleWatermark />
+                </AdaptiveImage>
               </View>
             ) : null}
 
@@ -1245,16 +1269,67 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
                     )
                   case 'IMAGE':
                     return block.url ? (
-                      <View key={block.id} style={styles.previewBlockImgWrap}>
-                        <View style={styles.previewBlockImgBox}>
-                          <Image source={{ uri: mediaUrl(block.url) }} style={styles.previewBlockImg} resizeMode="cover" />
+                      <View key={block.id} style={{ marginVertical: 10 }}>
+                        <AdaptiveImage
+                          source={{ uri: mediaUrl(block.url) || '' }}
+                          maxHeight={480}
+                          minHeight={200}
+                          borderRadius={10}
+                        >
                           <ArticleWatermark />
-                        </View>
+                        </AdaptiveImage>
                         {block.caption ? (
                           <Text style={[styles.previewBlockCaption, { color: colors.textLight }]}>{block.caption}</Text>
                         ) : null}
                       </View>
                     ) : null
+                  case 'TABLE': {
+                    const t = block.tableData
+                    if (!t || (!t.headers?.length && !t.rows?.length)) return null
+                    return (
+                      <View key={block.id} style={{ marginVertical: 14 }}>
+                        {t.caption ? (
+                          <Text style={[styles.previewTableCaption, { color: colors.text }]}>
+                            {t.caption}
+                          </Text>
+                        ) : null}
+                        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.previewTableScroll}>
+                          <View style={[styles.previewTableGrid, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                            {t.hasHeader !== false && t.headers?.length ? (
+                              <View style={[styles.previewTableHeaderRow, { backgroundColor: colors.surfaceContainer, borderBottomColor: colors.border }]}>
+                                {t.headers.map((h, i) => (
+                                  <View key={i} style={[styles.previewTableCell, { borderRightColor: colors.border }]}>
+                                    <Text style={[styles.previewTableHeaderText, { color: colors.text }]}>
+                                      {h}
+                                    </Text>
+                                  </View>
+                                ))}
+                              </View>
+                            ) : null}
+                            {t.rows?.map((row, rIdx) => (
+                              <View
+                                key={rIdx}
+                                style={[
+                                  styles.previewTableRow,
+                                  { borderBottomColor: colors.border },
+                                  rIdx % 2 === 1 && { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' },
+                                  rIdx === t.rows.length - 1 && { borderBottomWidth: 0 },
+                                ]}
+                              >
+                                {row.map((cell, cIdx) => (
+                                  <View key={cIdx} style={[styles.previewTableCell, { borderRightColor: colors.border }]}>
+                                    <Text style={[styles.previewTableCellText, { color: colors.text }]}>
+                                      {cell}
+                                    </Text>
+                                  </View>
+                                ))}
+                              </View>
+                            ))}
+                          </View>
+                        </ScrollView>
+                      </View>
+                    )
+                  }
                   case 'DIVIDER':
                     return <View key={block.id} style={[styles.previewDivider, { borderColor: colors.border }]} />
                   case 'TEXT':
@@ -1617,5 +1692,42 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
+  },
+  previewTableCaption: {
+    marginBottom: 6,
+    textAlign: 'center',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  previewTableScroll: {
+    borderRadius: 10,
+  },
+  previewTableGrid: {
+    borderWidth: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  previewTableHeaderRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  previewTableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  previewTableCell: {
+    minWidth: 100,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRightWidth: 1,
+    justifyContent: 'center',
+  },
+  previewTableHeaderText: {
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  previewTableCellText: {
+    fontSize: 12,
+    lineHeight: 16,
   },
 })

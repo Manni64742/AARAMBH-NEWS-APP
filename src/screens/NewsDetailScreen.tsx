@@ -21,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { useRoute, useNavigation } from '@react-navigation/native'
 import { commentApi, contentApi, interactionApi, reporterApi, userApi } from '../api/endpoints'
-import { ArticleBlock, CommentItem, ContentItem, ReporterPublicProfile } from '../types'
+import { ArticleBlock, CommentItem, ContentItem, ReporterPublicProfile, TableData } from '../types'
 import { colors, fonts, fontFor, radius } from '../theme'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
@@ -35,6 +35,7 @@ import { YouTubePlayer } from '../components/YouTubePlayer'
 import { AppBackButton } from '../components/AppBackButton'
 import { videoIdFromUrl } from '../utils/youtube'
 import { ArticleWatermark } from '../components/ArticleWatermark'
+import { AdaptiveImage } from '../components/AdaptiveImage'
 
 function formatCommentTime(dateStr?: string | Date) {
   if (!dateStr) return 'Recently'
@@ -132,7 +133,7 @@ const cleanHtmlForMobile = (html = '') => {
   cleaned = cleaned.replace(/<p\b[^>]*>\s*(<h[1-6]\b[\s\S]*?<\/h[1-6]>)\s*<\/p>/gi, '$1')
 
   // Strip unwanted attributes from allowed tags
-  cleaned = cleaned.replace(/<(p|h[1-6]|b|strong|i|em|u|blockquote|ul|ol|li)\b[^>]*>/gi, '<$1>')
+  cleaned = cleaned.replace(/<(p|h[1-6]|b|strong|i|em|u|blockquote|ul|ol|li|table|thead|tbody|tr|th|td|caption)\b[^>]*>/gi, '<$1>')
 
   // Remove disallowed structural tags completely while keeping their inner content
   cleaned = cleaned.replace(/<\/?(?:div|section|article|header|footer|nav|aside|main|font|center|mark)\b[^>]*>/gi, '')
@@ -293,11 +294,12 @@ function FormattedInlineText({
 }
 
 interface ArticleContentBlock {
-  type: 'PARAGRAPH' | 'HEADING' | 'QUOTE' | 'LIST' | 'IMAGE' | 'DIVIDER'
+  type: 'PARAGRAPH' | 'HEADING' | 'QUOTE' | 'LIST' | 'IMAGE' | 'DIVIDER' | 'TABLE'
   level?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
   ordered?: boolean
   items?: string[]
   src?: string
+  tableData?: TableData
   rawHtml: string
 }
 
@@ -324,10 +326,10 @@ function parseHtmlToBlocks(rawHtml: string): ArticleContentBlock[] {
       continue
     }
 
-    const hasBlockTags = /<(?:p|div|h[1-6]|blockquote|ul|ol|hr)\b/i.test(part)
+    const hasBlockTags = /<(?:p|div|h[1-6]|blockquote|ul|ol|table|hr)\b/i.test(part)
 
     if (hasBlockTags) {
-      const blockRegex = /(<(?:p|div|h[1-6]|blockquote|ul|ol|hr)\b[\s\S]*?<\/(?:p|div|h[1-6]|blockquote|ul|ol)>|<hr\b[^>]*>)/gi
+      const blockRegex = /(<(?:p|div|h[1-6]|blockquote|ul|ol|table)\b[\s\S]*?<\/(?:p|div|h[1-6]|blockquote|ul|ol|table)>|<hr\b[^>]*>)/gi
       const rawBlocks = part.split(blockRegex)
 
       for (const b of rawBlocks) {
@@ -383,6 +385,36 @@ function parseHtmlToBlocks(rawHtml: string): ArticleContentBlock[] {
           continue
         }
 
+        const tableMatch = trimmed.match(/^<table\b[^>]*>([\s\S]*?)<\/table>$/i)
+        if (tableMatch) {
+          const tableHtml = tableMatch[1]
+          const captionMatch = tableHtml.match(/<caption\b[^>]*>([\s\S]*?)<\/caption>/i)
+          const caption = captionMatch ? stripHtml(captionMatch[1]) : undefined
+          const thMatches = [...tableHtml.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/gi)]
+          const headers = thMatches.map((m) => stripHtml(m[1])).filter(Boolean)
+          const trMatches = [...tableHtml.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
+          const rows: string[][] = []
+          for (const tr of trMatches) {
+            const tdMatches = [...tr[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)]
+            if (tdMatches.length > 0) {
+              rows.push(tdMatches.map((m) => stripHtml(m[1])))
+            }
+          }
+          if (headers.length > 0 || rows.length > 0) {
+            blocks.push({
+              type: 'TABLE',
+              tableData: {
+                caption,
+                headers: headers.length > 0 ? headers : undefined,
+                rows,
+                hasHeader: headers.length > 0,
+              },
+              rawHtml: trimmed,
+            })
+            continue
+          }
+        }
+
         const pMatch = trimmed.match(/^<(?:p|div)\b[^>]*>([\s\S]*?)<\/(?:p|div)>$/i)
         if (pMatch) {
           const inner = pMatch[1].trim()
@@ -434,9 +466,10 @@ function TextBlockView({ html = '' }: { html?: string }) {
       {contentBlocks.map((block, index) => {
         if (block.type === 'IMAGE' && block.src) {
           return (
-            <View key={`img-${index}`} style={styles.inlineImageWrap}>
-              <Image source={{ uri: block.src }} style={styles.inlineImage} contentFit="contain" />
-              <ArticleWatermark compact />
+            <View key={`img-${index}`} style={{ marginVertical: 10 }}>
+              <AdaptiveImage source={{ uri: block.src }} maxHeight={480} minHeight={200} borderRadius={10}>
+                <ArticleWatermark compact />
+              </AdaptiveImage>
             </View>
           )
         }
@@ -550,6 +583,10 @@ function TextBlockView({ html = '' }: { html?: string }) {
           return <View key={`div-${index}`} style={styles.divider} />
         }
 
+        if (block.type === 'TABLE' && block.tableData) {
+          return <RenderTableBlock key={`tbl-${index}`} tableData={block.tableData} />
+        }
+
         // Default: PARAGRAPH
         return (
           <View
@@ -579,8 +616,85 @@ function TextBlockView({ html = '' }: { html?: string }) {
   )
 }
 
+function RenderTableBlock({ tableData }: { tableData?: TableData }) {
+  const { colors, fontScale, isDark } = useTheme()
+  const t = tableData
+  if (!t || (!t.headers?.length && !t.rows?.length)) return null
+
+  return (
+    <View style={{ marginVertical: Math.round(14 * fontScale) }}>
+      {t.caption ? (
+        <Text
+          style={[
+            styles.tableCaption,
+            {
+              color: colors.text,
+              fontFamily: fontFor(t.caption, 700),
+              fontSize: Math.round(14 * fontScale),
+            },
+          ]}
+        >
+          {t.caption}
+        </Text>
+      ) : null}
+      <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.tableScrollContainer}>
+        <View style={[styles.tableViewGrid, { borderColor: colors.border, backgroundColor: colors.card }]}>
+          {t.hasHeader !== false && t.headers?.length ? (
+            <View style={[styles.tableHeaderRowView, { backgroundColor: colors.surfaceContainer, borderBottomColor: colors.border }]}>
+              {t.headers.map((h: string, i: number) => (
+                <View key={i} style={[styles.tableCellView, { borderRightColor: colors.border }]}>
+                  <Text
+                    style={[
+                      styles.tableHeaderCellText,
+                      {
+                        color: colors.text,
+                        fontFamily: fontFor(h, 700),
+                        fontSize: Math.round(13 * fontScale),
+                      },
+                    ]}
+                  >
+                    {h}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {t.rows?.map((row: string[], rIdx: number) => (
+            <View
+              key={rIdx}
+              style={[
+                styles.tableRowView,
+                { borderBottomColor: colors.border },
+                rIdx % 2 === 1 && { backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' },
+                rIdx === t.rows.length - 1 && { borderBottomWidth: 0 },
+              ]}
+            >
+              {row.map((cell: string, cIdx: number) => (
+                <View key={cIdx} style={[styles.tableCellView, { borderRightColor: colors.border }]}>
+                  <Text
+                    style={[
+                      styles.tableCellText,
+                      {
+                        color: colors.text,
+                        fontFamily: fontFor(cell, 400),
+                        fontSize: Math.round(13 * fontScale),
+                      },
+                    ]}
+                  >
+                    {cell}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  )
+}
+
 function BlockView({ block }: { block: ArticleBlock }) {
-  const { colors, fontScale } = useTheme()
+  const { colors, fontScale, isDark } = useTheme()
   const text = block.type === 'TEXT' ? stripHtml(block.html) : block.text || ''
   if (block.type === 'TEXT')
     return <TextBlockView html={block.html} />
@@ -629,13 +743,26 @@ function BlockView({ block }: { block: ArticleBlock }) {
       </View>
     )
   if (block.type === 'DIVIDER') return <View style={styles.divider} />
+  if (block.type === 'TABLE') {
+    const t = block.tableData || {
+      headers: (block as any).headers,
+      rows: (block as any).rows,
+      caption: (block as any).caption,
+      hasHeader: (block as any).hasHeader,
+    }
+    return <RenderTableBlock tableData={t} />
+  }
   if (block.type === 'IMAGE')
     return block.url ? (
       <View style={styles.blockImageWrap}>
-        <View style={styles.blockImageBox}>
-          <Image source={{ uri: mediaUrl(block.url) }} style={styles.blockImage} contentFit="cover" />
+        <AdaptiveImage
+          source={{ uri: mediaUrl(block.url) }}
+          maxHeight={480}
+          minHeight={200}
+          borderRadius={10}
+        >
           <ArticleWatermark position="top-left" compact />
-        </View>
+        </AdaptiveImage>
         {block.caption ? (
           <Text style={[styles.blockImageCaption, { color: colors.textMuted }]}>{block.caption}</Text>
         ) : null}
@@ -1024,9 +1151,13 @@ export default function NewsDetailScreen() {
           ) : videoSrc ? (
             <VideoView player={videoPlayer} style={styles.hero} contentFit="contain" />
           ) : image ? (
-            <View style={[styles.heroWrap, { backgroundColor: themeColors.surfaceContainer }]}>
-              <Image source={{ uri: image }} style={styles.hero} contentFit="cover" transition={200} />
-              
+            <AdaptiveImage
+              source={{ uri: image }}
+              containerStyle={{ marginTop: 12 }}
+              maxHeight={500}
+              minHeight={220}
+              borderRadius={10}
+            >
               {!captionVisible && (
                 <>
                   <ArticleWatermark position="top-left" compact />
@@ -1061,7 +1192,7 @@ export default function NewsDetailScreen() {
                   </Pressable>
                 </View>
               )}
-            </View>
+            </AdaptiveImage>
           ) : null}
 
           <NativeText style={[styles.title, { color: themeColors.text, fontFamily: fontFor(item.title, 700), fontSize: Math.round(26 * fontScale), lineHeight: Math.round(34 * fontScale) }]}>{item.title}</NativeText>
@@ -1873,5 +2004,39 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  tableCaption: {
+    marginBottom: 8,
+    textAlign: 'center',
+    fontWeight: '700',
+  },
+  tableScrollContainer: {
+    borderRadius: 12,
+  },
+  tableViewGrid: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  tableHeaderRowView: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  tableRowView: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  tableCellView: {
+    minWidth: 110,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRightWidth: 1,
+    justifyContent: 'center',
+  },
+  tableHeaderCellText: {
+    fontWeight: '700',
+  },
+  tableCellText: {
+    lineHeight: 18,
   },
 })

@@ -1,7 +1,7 @@
 export type UserRole = 'USER' | 'REPORTER' | 'ADMIN' | 'SUPER_ADMIN'
 export type ContentType = 'ARTICLE' | 'SHORT_NEWS' | 'VIDEO' | 'SHORT_VIDEO' | 'AUDIO' | 'POLL' | 'LIVE_BLOG' | 'FACT_CHECK'
 export type ContentStatus = 'DRAFT' | 'PENDING_REVIEW' | 'APPROVED' | 'PUBLISHED' | 'SCHEDULED' | 'REJECTED' | 'ARCHIVED'
-export type ArticleBlockType = 'TEXT' | 'IMAGE' | 'GALLERY' | 'VIDEO' | 'AUDIO' | 'YOUTUBE' | 'ADVERTISEMENT' | 'QUOTE' | 'HEADING' | 'DIVIDER' | 'EMBED' | 'RELATED_STORY'
+export type ArticleBlockType = 'TEXT' | 'IMAGE' | 'GALLERY' | 'VIDEO' | 'AUDIO' | 'YOUTUBE' | 'ADVERTISEMENT' | 'QUOTE' | 'HEADING' | 'DIVIDER' | 'EMBED' | 'RELATED_STORY' | 'TABLE'
 
 export interface GalleryImage {
   id: string
@@ -9,6 +9,13 @@ export interface GalleryImage {
   caption?: string
   alt?: string
   credit?: string
+}
+
+export interface TableData {
+  headers?: string[]
+  rows: string[][]
+  caption?: string
+  hasHeader?: boolean
 }
 
 export interface ArticleBlock {
@@ -27,6 +34,7 @@ export interface ArticleBlock {
   relatedTitle?: string
   adSlot?: string
   items?: GalleryImage[]
+  tableData?: TableData
 }
 
 export interface User {
