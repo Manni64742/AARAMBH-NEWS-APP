@@ -122,6 +122,18 @@ export async function runPushNotificationDiagnostic(): Promise<DiagnosticResult>
   let errorMsg = ''
 
   try {
+    if ((Platform.OS as string) === 'web') {
+      return {
+        ok: true,
+        step: 'completed',
+        permissionStatus: 'granted',
+        token: null,
+        deviceId,
+        serverRegistered: true,
+        appVersion,
+      }
+    }
+
     step = 'setupChannel'
     await setupNotificationChannel()
 
@@ -215,7 +227,7 @@ export async function runPushNotificationDiagnostic(): Promise<DiagnosticResult>
           {
             token,
             deviceId,
-            platform: Platform.OS,
+            platform: (Platform.OS as string),
             language: 'hi',
             state: userState,
             city: userCity,
@@ -327,20 +339,26 @@ export function registerForPushNotificationsAsync(): Promise<string | null> {
 }
 
 async function executePushRegistration(): Promise<string | null> {
+  if ((Platform.OS as string) === 'web') {
+    // Push notifications via Expo Push Token require VAPID keys on web browsers.
+    // Gracefully return null on web so mobile preview in browser runs cleanly.
+    return null
+  }
+
   const deviceId = await getOrCreateDeviceId()
   const appVersion = Constants.expoConfig?.version || '1.0.3'
 
   let deviceModel: string | undefined
   let osVersion: string | undefined
   try {
-    if (Platform.OS === 'android') {
+    if ((Platform.OS as string) === 'android') {
       const constants = Platform.constants as any
       const manufacturer = constants?.Manufacturer || ''
       const model = constants?.Model || ''
       const brand = constants?.Brand || ''
       deviceModel = [manufacturer, model || brand].filter(Boolean).join(' ').trim() || 'Android Device'
       osVersion = `Android ${constants?.Release || Platform.Version}`
-    } else if (Platform.OS === 'ios') {
+    } else if ((Platform.OS as string) === 'ios') {
       deviceModel = (Platform.constants as any)?.systemName || 'Apple Device'
       osVersion = `iOS ${Platform.Version}`
     }
@@ -402,7 +420,7 @@ async function executePushRegistration(): Promise<string | null> {
       }
     }
 
-    if (!token && lastPushError) {
+    if (!token && lastPushError && (Platform.OS as string) !== 'web') {
       const pushErrMsg = lastPushError?.message || String(lastPushError)
       console.error('[Notification] Expo push token fetch error after retries:', pushErrMsg)
     }
@@ -432,7 +450,7 @@ async function executePushRegistration(): Promise<string | null> {
 
       // Deduplication: Avoid redundant network requests if recently synced with identical config
       const lastSyncKey = 'aarambh_last_token_sync'
-      const payloadSignature = `${token}:${userState || ''}:${userCity || ''}:${userInterests.sort().join(',')}`
+      const payloadSignature = `${token}:${appVersion}:${userState || ''}:${userCity || ''}:${userInterests.sort().join(',')}`
       const lastSyncRaw = await AsyncStorage.getItem(lastSyncKey).catch(() => null)
       if (lastSyncRaw) {
         try {

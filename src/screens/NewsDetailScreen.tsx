@@ -112,6 +112,39 @@ const cleanHtmlForMobile = (html = '') => {
   // Unwrap any remaining spans so raw <span ...> never appears
   cleaned = cleaned.replace(/<\/?span\b[^>]*>/gi, '')
 
+  // Normalize headings wrapping paragraphs (e.g. <h4><p>...</p></h4>)
+  cleaned = cleaned.replace(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi, (match, level, inner) => {
+    if (/<p\b/i.test(inner)) {
+      const pMatches = [...inner.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
+      if (pMatches.length > 0) {
+        const leadingText = inner.split(/<p\b/i)[0].replace(/<[^>]*>/g, '').trim()
+        const paragraphs = pMatches.map((m) => '<p>' + m[1].trim() + '</p>').join('')
+        if (leadingText) {
+          return '<h' + level + '>' + leadingText + '</h' + level + '>' + paragraphs
+        }
+        return paragraphs
+      }
+    }
+    return match
+  })
+
+  // Normalize paragraphs wrapping headings (e.g. <p><h4>...</h4></p>)
+  cleaned = cleaned.replace(/<p\b[^>]*>\s*(<h[1-6]\b[\s\S]*?<\/h[1-6]>)\s*<\/p>/gi, '$1')
+
+  // Strip unwanted attributes from allowed tags
+  cleaned = cleaned.replace(/<(p|h[1-6]|b|strong|i|em|u|blockquote|ul|ol|li)\b[^>]*>/gi, '<$1>')
+
+  // Remove disallowed structural tags completely while keeping their inner content
+  cleaned = cleaned.replace(/<\/?(?:div|section|article|header|footer|nav|aside|main|font|center|mark)\b[^>]*>/gi, '')
+
+  // Clean empty paragraphs and headings
+  cleaned = cleaned
+    .replace(/<p>\s*<\/p>/gi, '')
+    .replace(/<h[1-6]>\s*<\/h[1-6]>/gi, '')
+    .replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, '')
+    .replace(/(?:<br\s*\/?>\s*){3,}/gi, '<br><br>')
+    .trim()
+
   return cleaned
 }
 
@@ -364,7 +397,7 @@ function parseHtmlToBlocks(rawHtml: string): ArticleContentBlock[] {
 
         const subParts = trimmed.split(/(?:<br\s*\/?>\s*){2,}|\n\n+/gi)
         for (const sp of subParts) {
-          const cleanSp = sp.trim()
+          const cleanSp = sp.replace(/^<\/?(?:p|h[1-6])\b[^>]*>/gi, '').replace(/<\/?(?:p|h[1-6])>$/gi, '').trim()
           if (cleanSp) {
             blocks.push({
               type: 'PARAGRAPH',
@@ -376,7 +409,7 @@ function parseHtmlToBlocks(rawHtml: string): ArticleContentBlock[] {
     } else {
       const subParts = part.split(/(?:<br\s*\/?>\s*){2,}|\n\n+/gi)
       for (const sp of subParts) {
-        const cleanSp = sp.trim()
+        const cleanSp = sp.replace(/^<\/?(?:p|h[1-6])\b[^>]*>/gi, '').replace(/<\/?(?:p|h[1-6])>$/gi, '').trim()
         if (cleanSp) {
           blocks.push({
             type: 'PARAGRAPH',
