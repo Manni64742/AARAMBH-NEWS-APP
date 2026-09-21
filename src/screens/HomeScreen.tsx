@@ -45,6 +45,7 @@ import { TrendingRankedList } from '../components/TrendingRankedList'
 import {
   ThematicSectionData,
   bundleItemToContentItem,
+  contentItemToBundleItem,
   BundleCardData,
   BundleNewsItem,
   TrendingRankItem,
@@ -577,11 +578,11 @@ export default function HomeScreen({ navigation }: any) {
   }
 
   /* Genuine breaking news only - strictly exclude non-breaking articles */
-  const validBreaking = (breaking || []).filter((i) => i && i.title && (i.flags?.isBreaking ?? true))
-  const validFeedBreaking = (feed.items || []).filter((i) => i && i.title && i.flags?.isBreaking)
-  const validCatHeadlines = (categoryHeadlines || []).filter((i) => i && i.title)
-  const validFeedItems = (feed.items || []).filter((i) => i && i.title)
-  const validTrending = (trending || []).filter((i) => i && i.title)
+  const validBreaking = (breaking || []).filter((i) => Boolean(i && i.title && (i.flags?.isBreaking ?? true)))
+  const validFeedBreaking = (feed.items || []).filter((i) => Boolean(i && i.title && i.flags?.isBreaking))
+  const validCatHeadlines = (categoryHeadlines || []).filter((i) => Boolean(i && (i._id || i.title)))
+  const validFeedItems = (feed.items || []).filter((i) => Boolean(i && (i._id || i.title)))
+  const validTrending = (trending || []).filter((i) => Boolean(i && (i._id || i.title)))
 
   const breakingItems = validBreaking.length > 0 ? validBreaking : validFeedBreaking
 
@@ -621,6 +622,28 @@ export default function HomeScreen({ navigation }: any) {
   const openLive = () => navigation.navigate('LiveNews')
   const openLocations = () => navigation.navigate('Locations')
   const openCategories = () => navigation.navigate('Categories')
+
+  const openCategorySlidingAll = () => {
+    const title = activeSubCatObj
+      ? (language === 'hi'
+          ? `${activeSubCatObj.name.hi || activeSubCatObj.name.en} ट्रेंड्स`
+          : `${activeSubCatObj.name.en || activeSubCatObj.name.hi} Trends`)
+      : isMarket
+        ? (language === 'hi' ? 'मार्केट ट्रेंड्स' : 'Market Trends')
+        : (language === 'hi' ? 'ट्रेंडिंग अभी' : 'Trending Now')
+
+    const secTitle = activeCatObj
+      ? (language === 'hi' ? (activeCatObj.name.hi || activeCatObj.name.en) : (activeCatObj.name.en || activeCatObj.name.hi))
+      : (isMarket ? (language === 'hi' ? 'मार्केट' : 'Market') : (language === 'hi' ? 'ट्रेंडिंग' : 'Trending'))
+
+    navigation.navigate('CategoryNewsList', {
+      title,
+      sectionTitle: secTitle,
+      categorySlug: activeCategory !== 'all' ? activeCategory : undefined,
+      subCategorySlug: activeSubCategory || undefined,
+      items: marketSlidingItems.map(contentItemToBundleItem),
+    })
+  }
 
   const openBundleItem = (item: BundleNewsItem | TrendingRankItem, catName = 'General') => {
     const fullContent = (item as any)._content || bundleItemToContentItem(item, catName)
@@ -899,7 +922,7 @@ export default function HomeScreen({ navigation }: any) {
                       : language === 'hi' ? 'ट्रेंडिंग अभी' : 'Trending Now'
                 }
                 action={language === 'hi' ? 'सभी देखें' : 'See all'}
-                onAction={openCategories}
+                onAction={openCategorySlidingAll}
               />
               <ScrollView
                 horizontal

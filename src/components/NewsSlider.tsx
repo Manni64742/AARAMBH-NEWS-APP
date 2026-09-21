@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
@@ -32,19 +32,24 @@ export const NewsSlider: React.FC<{
   const cardWidth = Math.max(width - spacing.lg * 2, 300)
   const cardMargin = spacing.md
 
+  const validItems = useMemo(
+    () => (items || []).filter((it): it is ContentItem => Boolean(it && (it._id || it.title))),
+    [items]
+  )
+
   useEffect(() => {
-    if (items.length < 2) return
+    if (validItems.length < 2) return
     const timer = setInterval(() => {
       setIndex((i) => {
-        const next = (i + 1) % items.length
+        const next = (i + 1) % validItems.length
         listRef.current?.scrollToOffset({ offset: next * (cardWidth + cardMargin), animated: true })
         return next
       })
     }, autoPlayMs)
     return () => clearInterval(timer)
-  }, [items.length, cardWidth, cardMargin, autoPlayMs])
+  }, [validItems.length, cardWidth, cardMargin, autoPlayMs])
 
-  if (!items.length) return null
+  if (!validItems.length) return null
 
   return (
     <View>
@@ -56,23 +61,24 @@ export const NewsSlider: React.FC<{
             <Text style={styles.sliderBadgeText}>SLIDER</Text>
           </View>
         </View>
-        <Text style={[styles.counter, { color: tc.textMuted }]}>{`${index + 1}/${items.length}`}</Text>
+        <Text style={[styles.counter, { color: tc.textMuted }]}>{`${Math.min(index + 1, validItems.length)}/${validItems.length}`}</Text>
       </View>
       <FlatList
         ref={listRef}
-        data={items}
+        data={validItems}
         horizontal
         pagingEnabled={false}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item, idx) => (item?._id ? `${item._id}-${idx}` : `slider-${idx}`)}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         snapToInterval={cardWidth + cardMargin}
         decelerationRate="fast"
         onMomentumScrollEnd={(e) => {
           const i = Math.round(e.nativeEvent.contentOffset.x / (cardWidth + cardMargin))
-          setIndex(Math.max(0, Math.min(items.length - 1, i)))
+          setIndex(Math.max(0, Math.min(validItems.length - 1, i)))
         }}
         renderItem={({ item }) => {
+          if (!item) return null
           const image = mediaUrl(item.featuredImage?.url)
           return (
             <Pressable
@@ -124,9 +130,9 @@ export const NewsSlider: React.FC<{
         }}
       />
       <View style={styles.dotsRow}>
-        {items.map((it, i) => (
+        {validItems.map((it, i) => (
           <Pressable
-            key={it._id}
+            key={it?._id ? `${it._id}-${i}` : `dot-${i}`}
             onPress={() => {
               setIndex(i)
               listRef.current?.scrollToOffset({ offset: i * (cardWidth + cardMargin), animated: true })

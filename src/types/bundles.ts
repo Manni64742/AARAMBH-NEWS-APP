@@ -88,6 +88,22 @@ export function isOrangeTag(tag: string): boolean {
 }
 
 /**
+ * Helper to convert a ContentItem into a BundleNewsItem
+ */
+export function contentItemToBundleItem(c: ContentItem): BundleNewsItem {
+  return {
+    id: c._id,
+    tag: (c.tags && c.tags[0]) || (c.category?.name?.en) || 'News',
+    title: c.title,
+    summary: c.summary || c.title,
+    imageUrl: c.featuredImage?.url || 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&q=80',
+    publishedAt: c.publishedAt ? new Date(c.publishedAt).toLocaleDateString() : 'Just now',
+    views: c.metrics?.views || 100,
+    _content: c,
+  }
+}
+
+/**
  * Helper to convert BundleNewsItem or TrendingRankItem into a full ContentItem for NewsDetail navigation
  */
 export function bundleItemToContentItem(

@@ -1,29 +1,16 @@
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import { contentApi } from '../api/endpoints'
 import { ContentItem } from '../types'
-import { BundleNewsItem, bundleItemToContentItem, getLocalizedTag, isOrangeTag } from '../types/bundles'
+import { BundleNewsItem, bundleItemToContentItem, contentItemToBundleItem, getLocalizedTag, isOrangeTag } from '../types/bundles'
 import { fonts, radius, spacing } from '../theme'
 import { ScaledText as Text } from '../components/ScaledText'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
 import { AdBanner } from '../components/AdBanner'
-
-function contentItemToBundleItem(c: ContentItem): BundleNewsItem {
-  return {
-    id: c._id,
-    tag: (c.tags && c.tags[0]) || (c.category?.name?.en) || 'News',
-    title: c.title,
-    summary: c.summary || c.title,
-    imageUrl: c.featuredImage?.url || 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&q=80',
-    publishedAt: c.publishedAt ? new Date(c.publishedAt).toLocaleDateString() : 'Just now',
-    views: c.metrics?.views || 100,
-    _content: c,
-  }
-}
 
 export default function CategoryNewsListScreen({ route, navigation }: any) {
   const { colors: tc, isDark } = useTheme()
@@ -73,11 +60,6 @@ export default function CategoryNewsListScreen({ route, navigation }: any) {
   }, [categorySlug, subCategorySlug, locationName, locationType, language])
 
   const onRefresh = useCallback(async () => {
-    if (!categorySlug && !subCategorySlug && !locationName) {
-      setRefreshing(true)
-      setTimeout(() => setRefreshing(false), 500)
-      return
-    }
     setRefreshing(true)
     try {
       const { items: freshItems, hasNext } = await fetchArticles(1)
@@ -90,10 +72,16 @@ export default function CategoryNewsListScreen({ route, navigation }: any) {
     } finally {
       setRefreshing(false)
     }
-  }, [categorySlug, subCategorySlug, locationName, fetchArticles])
+  }, [fetchArticles])
+
+  useEffect(() => {
+    if (initialItems.length === 0) {
+      onRefresh()
+    }
+  }, [initialItems.length, onRefresh])
 
   const loadMore = useCallback(async () => {
-    if (loadingMore || refreshing || !hasMore || (!categorySlug && !subCategorySlug && !locationName)) return
+    if (loadingMore || refreshing || !hasMore) return
     setLoadingMore(true)
     const nextPage = page + 1
     try {
@@ -114,7 +102,7 @@ export default function CategoryNewsListScreen({ route, navigation }: any) {
     } finally {
       setLoadingMore(false)
     }
-  }, [loadingMore, refreshing, hasMore, categorySlug, subCategorySlug, locationName, page, fetchArticles])
+  }, [loadingMore, refreshing, hasMore, page, fetchArticles])
 
   const openNews = (item: BundleNewsItem) => {
     const fullContent = (item as any)._content || bundleItemToContentItem(item, title)
@@ -169,7 +157,7 @@ export default function CategoryNewsListScreen({ route, navigation }: any) {
       {/* Articles List */}
       <FlatList
         data={articleList}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => (item?.id ? `${item.id}-${index}` : `news-${index}`)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         onEndReached={loadMore}
