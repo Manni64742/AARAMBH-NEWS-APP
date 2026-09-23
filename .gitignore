@@ -45,5 +45,4 @@ yarn-error.*
 # secrets & credentials
 *-firebase-adminsdk-*.json
 service-account*.json
-google-services.json
 
