@@ -1151,13 +1151,14 @@ export default function NewsDetailScreen() {
           ) : videoSrc ? (
             <VideoView player={videoPlayer} style={styles.hero} contentFit="contain" />
           ) : image ? (
-            <AdaptiveImage
-              source={{ uri: image }}
-              containerStyle={{ marginTop: 12 }}
-              maxHeight={500}
-              minHeight={220}
-              borderRadius={10}
-            >
+            <View style={[styles.heroWrap, { backgroundColor: themeColors.surfaceContainer }]}>
+              <Image
+                source={{ uri: image }}
+                style={styles.hero}
+                contentFit="cover"
+                transition={150}
+                priority="high"
+              />
               {!captionVisible && (
                 <>
                   <ArticleWatermark position="top-left" compact />
@@ -1192,7 +1193,7 @@ export default function NewsDetailScreen() {
                   </Pressable>
                 </View>
               )}
-            </AdaptiveImage>
+            </View>
           ) : null}
 
           <NativeText style={[styles.title, { color: themeColors.text, fontFamily: fontFor(item.title, 700), fontSize: Math.round(26 * fontScale), lineHeight: Math.round(34 * fontScale) }]}>{item.title}</NativeText>
