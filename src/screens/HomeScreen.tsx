@@ -603,7 +603,7 @@ Promise.all([
   const breakingItems = validBreaking.length > 0 ? validBreaking : [...validFeedBreaking].sort(byPublishedDesc)
 
   /* Featured stories prioritized for top hero slider */
-  const featuredFeedItems = validFeedItems.filter((i) => i.flags?.isFeatured)
+  const featuredFeedItems = validFeedItems.filter((i) => i.flags?.isFeatured || i.flags?.isBreaking)
   const nonFeaturedFeedItems = validFeedItems.filter((i) => !i.flags?.isFeatured)
 
   /* Slider headlines: prioritize featured articles & newest published article */
