@@ -986,10 +986,16 @@ export default function NewsDetailScreen() {
     }
   }
 
+  const getShareUrl = () => {
+    const webBase = (process.env.EXPO_PUBLIC_WEB_URL || 'https://aarambhnews.com').replace(/\/$/, '')
+    return `${webBase}/news/${item?.slug || item?._id || ''}`
+  }
+
   const handleNativeShare = async () => {
     if (!item) return
-    const url = `https://aarambhnews.com/news/${item.slug || item._id}`
-    const text = `${item.title}\n\n${url}`
+    const url = getShareUrl()
+    const summary = item.summary ? `\n\n${item.summary.slice(0, 140)}...` : ''
+    const text = `${item.title}${summary}\n\nआरम्भ न्यूज़ पर पढ़ें:\n${url}`
     try {
       await Share.share(
         {
@@ -1006,16 +1012,27 @@ export default function NewsDetailScreen() {
     }
   }
 
-  const shareMessage = () => `${item?.title}\n\nRead on Aarambh News`
+  const shareMessage = () => {
+    const summary = item?.summary ? `\n\n${item.summary.slice(0, 140)}...` : ''
+    return `${item?.title || 'आरम्भ न्यूज़'}${summary}\n\nआरम्भ न्यूज़ पर पूरी खबर पढ़ें:`
+  }
 
   const shareTo = async (platform: 'whatsapp' | 'facebook' | 'twitter' | 'more', e: any) => {
     e?.stopPropagation?.()
     const text = shareMessage()
-    const url = `https://aarambhnews.com/news/${item?.slug || ''}`
+    const url = getShareUrl()
     const urls: Record<string, string> = {
-      whatsapp: `https://api.whatsapp.com/send?text=${encodeURIComponent(text + '\n' + url)}`,
+      whatsapp: `whatsapp://send?text=${encodeURIComponent(text + '\n' + url)}`,
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(text)}`,
       twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
+    }
+    if (platform === 'whatsapp') {
+      Linking.openURL(urls.whatsapp).catch(() => {
+        Linking.openURL(`https://api.whatsapp.com/send?text=${encodeURIComponent(text + '\n' + url)}`).catch(() => {
+          Share.share({ message: `${text}\n${url}`, title: item?.title }).catch(() => {})
+        })
+      })
+      return
     }
     if (platform === 'more') {
       try {

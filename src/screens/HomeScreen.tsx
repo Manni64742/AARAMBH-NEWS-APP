@@ -24,6 +24,7 @@ import { CategoryChip, HorizontalNewsCard, NewsCard, SectionHeader } from '../co
 import { NewsSlider } from '../components/NewsSlider'
 import { AdBanner } from '../components/AdBanner'
 import MarketTicker from '../components/MarketTicker'
+import { TvLiveIcon } from '../components/TvLiveIcon'
 import {
   EmptyState,
   ErrorState,
@@ -110,26 +111,34 @@ function BreakingTicker({
           }
         : {})}
     >
-      {displayItems.map((item, idx) => (
-        <Pressable
-          key={`${key}-${item._id || 'item'}-${idx}`}
-          onPress={() => item && onPress(item)}
-          style={styles.tickerItem}
-        >
-          <Text
-            style={[
-              styles.breakingText,
-              { color: tc.text },
-              Platform.OS === 'web' && ({ whiteSpace: 'nowrap' } as any),
-            ]}
+      {displayItems.map((item, idx) => {
+        const itemTitle =
+          typeof item.title === 'string'
+            ? item.title
+            : typeof item.title === 'object' && item.title !== null
+              ? (language === 'en' ? ((item.title as any).en || (item.title as any).hi) : ((item.title as any).hi || (item.title as any).en))
+              : ''
+        return (
+          <Pressable
+            key={`${key}-${item._id || 'item'}-${idx}`}
+            onPress={() => item && onPress(item)}
+            style={styles.tickerItem}
           >
-            {item.title}
-          </Text>
-          <View style={styles.tickerDotWrap}>
-            <Text style={[styles.tickerDot, { color: tc.primary }]}>●</Text>
-          </View>
-        </Pressable>
-      ))}
+            <Text
+              style={[
+                styles.breakingText,
+                { color: tc.text },
+                Platform.OS === 'web' && ({ whiteSpace: 'nowrap' } as any),
+              ]}
+            >
+              {itemTitle}
+            </Text>
+            <View style={styles.tickerDotWrap}>
+              <Text style={[styles.tickerDot, { color: tc.primary }]}>●</Text>
+            </View>
+          </Pressable>
+        )
+      })}
     </View>
   )
 
@@ -177,11 +186,11 @@ function LiveBanner({
   const liveCount = streams.filter((s) => s.status === 'LIVE').length || streams.length
   if (!streams.length) return null
 
-  const bannerBg = isDark ? '#092518' : '#ECFDF5'
-  const bannerBorder = isDark ? '#15442c' : '#A7F3D0'
-  const pulseBg = isDark ? '#0d3824' : '#D1FAE5'
-  const primaryGreen = isDark ? '#10B981' : '#059669'
-  const subColor = isDark ? '#6EE7B7' : '#047857'
+  const bannerBg = isDark ? 'rgba(255, 87, 34, 0.1)' : '#FFF3ED'
+  const bannerBorder = isDark ? 'rgba(255, 87, 34, 0.28)' : '#FFD4C2'
+  const pulseBg = isDark ? 'rgba(255, 87, 34, 0.2)' : '#FFE0D1'
+  const primaryColor = colors.primary // #FF5722
+  const subColor = isDark ? '#FFA07A' : '#D84315'
 
   return (
     <Pressable
@@ -196,11 +205,11 @@ function LiveBanner({
       onPress={onPress}
     >
       <View style={styles.liveBannerLeft}>
-        <View style={[styles.liveBannerPulse, { backgroundColor: pulseBg }]}>
-          <Ionicons name="radio" size={15} color={primaryGreen} />
+        <View style={styles.liveBannerPulse}>
+          <TvLiveIcon size={20} color={primaryColor} />
         </View>
         <View style={styles.liveBannerTexts}>
-          <Text style={[styles.liveBannerTitle, { color: primaryGreen }]}>LIVE NOW</Text>
+          <Text style={[styles.liveBannerTitle, { color: primaryColor }]}>LIVE NOW</Text>
           <Text style={[styles.liveBannerSub, { color: subColor }]} numberOfLines={1}>
             {language === 'hi'
               ? `${liveCount} सक्रिय स्ट्रीम — YouTube पर लाइव खबरें देखें`
@@ -208,7 +217,7 @@ function LiveBanner({
           </Text>
         </View>
       </View>
-      <View style={[styles.liveBannerBtn, { backgroundColor: isDark ? '#10B981' : '#059669' }]}>
+      <View style={[styles.liveBannerBtn, { backgroundColor: primaryColor }]}>
         <Text style={styles.liveBannerBtnText}>
           {language === 'hi' ? 'देखें' : 'WATCH'}
         </Text>
@@ -232,6 +241,7 @@ export default function HomeScreen({ navigation }: any) {
   const [categories, setCategories] = useState<CategoryItem[]>([])
   const [breaking, setBreaking] = useState<ContentItem[]>([])
   const [trending, setTrending] = useState<ContentItem[]>([])
+  const [refreshTick, setRefreshTick] = useState(0)
   const [stateNews, setStateNews] = useState<ContentItem[]>([])
   const [cityNews, setCityNews] = useState<ContentItem[]>([])
   const [liveStreams, setLiveStreams] = useState<LiveStreamItem[]>([])
@@ -524,12 +534,16 @@ export default function HomeScreen({ navigation }: any) {
       }
     }
 
-    Promise.all([
+Promise.all([
       contentApi.list(breakingParams),
       contentApi.list(trendingParams),
     ]).then(([bRes, tRes]) => {
       const bData = bRes.data || []
       const tData = tRes.data || []
+      // Newest published breaking story first (publishedAt reflects actual publish time)
+      bData.sort((a: ContentItem, b: ContentItem) =>
+        new Date(b.publishedAt || b.createdAt || 0).getTime() - new Date(a.publishedAt || a.createdAt || 0).getTime()
+      )
       setBreaking(bData)
       setTrending(tData)
       const existing = tabCacheRef.current.get(cacheKey) || { ts: Date.now() }
@@ -538,7 +552,7 @@ export default function HomeScreen({ navigation }: any) {
       setBreaking([])
       setTrending([])
     })
-  }, [location, activeCategory, activeSubCategory, language])
+  }, [location, activeCategory, activeSubCategory, language, refreshTick])
 
   useEffect(() => {
     if (!location?.state || isMarket || activeCategory) {
@@ -584,7 +598,9 @@ export default function HomeScreen({ navigation }: any) {
   const validFeedItems = (feed.items || []).filter((i) => Boolean(i && (i._id || i.title)))
   const validTrending = (trending || []).filter((i) => Boolean(i && (i._id || i.title)))
 
-  const breakingItems = validBreaking.length > 0 ? validBreaking : validFeedBreaking
+  const byPublishedDesc = (a: ContentItem, b: ContentItem) =>
+    new Date(b.publishedAt || b.createdAt || 0).getTime() - new Date(a.publishedAt || a.createdAt || 0).getTime()
+  const breakingItems = validBreaking.length > 0 ? validBreaking : [...validFeedBreaking].sort(byPublishedDesc)
 
   /* Featured stories prioritized for top hero slider */
   const featuredFeedItems = validFeedItems.filter((i) => i.flags?.isFeatured)
@@ -817,7 +833,11 @@ export default function HomeScreen({ navigation }: any) {
                         style={[styles.indiaTitle, { color: themeColors.text }]}
                         numberOfLines={2}
                       >
-                        {item.title}
+                        {typeof item.title === 'string'
+                          ? item.title
+                          : typeof item.title === 'object' && item.title !== null
+                            ? (language === 'en' ? ((item.title as any).en || (item.title as any).hi) : ((item.title as any).hi || (item.title as any).en))
+                            : ''}
                       </Text>
                       <Text style={[styles.timeText, { color: themeColors.textMuted }]}>
                         {item.publishedAt}
@@ -1030,6 +1050,7 @@ export default function HomeScreen({ navigation }: any) {
             refreshing={feed.refreshing}
             onRefresh={() => {
               tabCacheRef.current.clear()
+              setRefreshTick((t) => t + 1) // retrigger breaking/trending refetch
               feed.refresh()
               loadHomeBundles()
               categoryApi.tree().then((t) => { if (Array.isArray(t) && t.length > 0) setCategories(t) }).catch(() => {})
@@ -1084,18 +1105,12 @@ export default function HomeScreen({ navigation }: any) {
               <Ionicons name="search" size={21} color={themeColors.text} />
             </Pressable>
             <Pressable
-              style={[
-                styles.liveHeaderBtn,
-                {
-                  backgroundColor: isDark ? '#092518' : '#ECFDF5',
-                  borderColor: isDark ? '#15442c' : '#A7F3D0',
-                },
-              ]}
+              style={styles.iconBtn}
               onPress={() => navigation.navigate('LiveNews')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Live TV"
             >
-              <Ionicons name="radio" size={15} color={isDark ? '#10B981' : '#059669'} />
-              <Text style={[styles.liveHeaderBtnText, { color: isDark ? '#10B981' : '#059669' }]}>LIVE</Text>
+              <TvLiveIcon size={24} color="#FF5722" />
             </Pressable>
             <Pressable
               style={styles.iconBtn}
@@ -1259,12 +1274,11 @@ const styles = StyleSheet.create({
     lineHeight: 11,
   },
   liveHeaderBtn: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
     borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 4.5,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
     borderRadius: radius.pill,
   },
   liveHeaderBtnText: {

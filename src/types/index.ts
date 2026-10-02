@@ -134,8 +134,8 @@ export interface ContentItem {
   scheduledFor?: string
   createdAt: string
   updatedAt?: string
-  videoPayload?: { videoUrl: string; thumbnail?: string; duration?: number }
-  shortVideoPayload?: { videoUrl: string; thumbnail?: string; duration?: number }
+  videoPayload?: { videoUrl: string; thumbnail?: string; duration?: number; youtubeId?: string; channelUrl?: string }
+  shortVideoPayload?: { videoUrl: string; thumbnail?: string; duration?: number; youtubeId?: string; channelUrl?: string }
   youtubeUrl?: string
   youtubeId?: string
   imageCaption?: string
@@ -237,6 +237,7 @@ export interface LiveStreamItem {
   status: 'SCHEDULED' | 'LIVE' | 'ENDED'
   isActive?: boolean
   displayOrder?: number
+  viewsCount?: number
   scheduledFor?: string
   createdAt?: string
 }

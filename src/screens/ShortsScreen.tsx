@@ -4,6 +4,7 @@ import { ScaledText as Text } from '../components/ScaledText'
 import { useTheme } from '../context/ThemeContext'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useVideoPlayer, VideoView } from 'expo-video'
+import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { contentApi, interactionApi } from '../api/endpoints'
 import { ContentItem } from '../types'
@@ -12,11 +13,12 @@ import { ErrorState } from '../components/States'
 import { AppBackButton } from '../components/AppBackButton'
 import { usePagedFeed } from '../hooks/usePagedFeed'
 import { mediaUrl } from '../config'
+import { YouTubePlayer } from '../components/YouTubePlayer'
+import { videoIdFromUrl, youtubeThumb } from '../utils/youtube'
 
 const { height } = Dimensions.get('window')
 
-function ReelItem({ item, active, onLike }: { item: ContentItem; active: boolean; onLike: () => void }) {
-  const source = item.shortVideoPayload?.videoUrl || item.videoPayload?.videoUrl
+function NativeVideoPlayer({ source, active }: { source: string; active: boolean }) {
   const player = useVideoPlayer(active && source ? (mediaUrl(source) as any) : null, (p) => {
     p.loop = true
     if (active) p.play()
@@ -27,27 +29,87 @@ function ReelItem({ item, active, onLike }: { item: ContentItem; active: boolean
     else player.pause()
   }, [active, source, player])
 
-  if (!source) return null
+  return (
+    <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+  )
+}
+
+function YouTubeReelPlayer({ videoId, active }: { videoId: string; active: boolean }) {
+  const thumb = youtubeThumb(videoId)
+  if (!active) {
+    return (
+      <View style={StyleSheet.absoluteFill}>
+        {thumb ? (
+          <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+        )}
+      </View>
+    )
+  }
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <YouTubePlayer videoId={videoId} autoplay={true} active={active} />
+    </View>
+  )
+}
+
+function ReelItem({ item, active, onLike }: { item: ContentItem; active: boolean; onLike: () => void }) {
+  const rawUrl =
+    item.shortVideoPayload?.videoUrl ||
+    item.videoPayload?.videoUrl ||
+    (item as any).youtubeUrl ||
+    (item as any).mediaUrl ||
+    ''
+
+  const ytId =
+    item.shortVideoPayload?.youtubeId ||
+    item.videoPayload?.youtubeId ||
+    videoIdFromUrl(rawUrl)
+
+  useEffect(() => {
+    if (active && item._id) {
+      contentApi.recordView(item._id).catch(() => {})
+    }
+  }, [active, item._id])
+
+  if (!rawUrl && !ytId) return null
+
+  const titleText =
+    typeof item.title === 'object'
+      ? ((item.title as any)?.hi || (item.title as any)?.en || '')
+      : item.title || ''
+
+  const categoryName =
+    typeof item.category === 'object'
+      ? ((item.category as any)?.name?.hi || (item.category as any)?.name?.en || (item.category as any)?.name || 'Shorts')
+      : 'Shorts'
 
   return (
     <View style={styles.reel}>
-      <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
-      <View style={styles.reelInfo}>
-        <Text style={styles.reelCategory}>{item.category?.name?.en || 'Shorts'}</Text>
+      {ytId ? (
+        <YouTubeReelPlayer videoId={ytId} active={active} />
+      ) : (
+        <NativeVideoPlayer source={rawUrl} active={active} />
+      )}
+      <View style={styles.reelInfo} pointerEvents="box-none">
+        <Text style={styles.reelCategory}>{categoryName}</Text>
         <Text style={styles.reelTitle} numberOfLines={3}>
-          {item.title}
+          {titleText}
         </Text>
         <Text style={styles.reelMeta}>
           {item.author?.name || 'Aarambh News'} · 👁 {(item.metrics?.views || 0).toLocaleString()}
         </Text>
       </View>
-      <View style={styles.actions}>
-        <Text style={styles.actionIcon} onPress={onLike}>
-          {item.metrics?.likes ? '❤️' : '🤍'}
-        </Text>
-        <Text style={styles.actionCount}>{item.metrics?.likes || 0}</Text>
-        <Text style={styles.actionIcon}>🔖</Text>
-        <Text style={styles.actionCount}>Share</Text>
+      <View style={styles.actions} pointerEvents="box-none">
+        <TouchableOpacity onPress={onLike} hitSlop={10} style={{ alignItems: 'center' }}>
+          <Text style={styles.actionIcon}>{item.metrics?.likes ? '❤️' : '🤍'}</Text>
+          <Text style={styles.actionCount}>{item.metrics?.likes || 0}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity hitSlop={10} style={{ alignItems: 'center' }}>
+          <Text style={styles.actionIcon}>🔖</Text>
+          <Text style={styles.actionCount}>Share</Text>
+        </TouchableOpacity>
       </View>
     </View>
   )
@@ -57,9 +119,20 @@ export default function ShortsScreen({ navigation, onBackToVideos }: any) {
   const { colors: tc, isDark } = useTheme()
   const load = useCallback(async (page: number) => {
     const res = await contentApi.list({ page, limit: 10, status: 'PUBLISHED', contentType: 'SHORT_VIDEO' })
-    // Strict filter: ONLY real short videos with a video URL
-    const valid = (res.data || []).filter(
-      (i: ContentItem) => i.contentType === 'SHORT_VIDEO' && !!(i.shortVideoPayload?.videoUrl || i.videoPayload?.videoUrl)
+    const list = Array.isArray(res) ? res : (res?.data || [])
+    // Strict filter: ONLY real short videos with a video URL or YouTube ID
+    const valid = list.filter(
+      (i: ContentItem) =>
+        i.contentType === 'SHORT_VIDEO' &&
+        !!(
+          i.shortVideoPayload?.videoUrl ||
+          i.videoPayload?.videoUrl ||
+          (i as any).youtubeUrl ||
+          (i as any).mediaUrl ||
+          i.shortVideoPayload?.youtubeId ||
+          i.videoPayload?.youtubeId ||
+          (i as any).youtubeId
+        )
     )
     return { data: valid, pagination: res.pagination }
   }, [])
@@ -67,6 +140,30 @@ export default function ShortsScreen({ navigation, onBackToVideos }: any) {
   const feed = usePagedFeed({ load })
   const [activeIndex, setActiveIndex] = useState(0)
   const listRef = useRef<FlatList>(null)
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems && viewableItems.length > 0) {
+      const visibleItem = viewableItems.find((v: any) => v.isViewable) || viewableItems[0]
+      if (visibleItem && typeof visibleItem.index === 'number') {
+        setActiveIndex(visibleItem.index)
+      }
+    }
+  }).current
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 60,
+  }).current
+
+  const handleScroll = useCallback(
+    (e: any) => {
+      const offsetY = e.nativeEvent.contentOffset.y
+      const nextIndex = Math.round(offsetY / height)
+      if (nextIndex >= 0 && nextIndex !== activeIndex) {
+        setActiveIndex(nextIndex)
+      }
+    },
+    [activeIndex]
+  )
 
   const onLike = async (item: ContentItem) => {
     try {
@@ -133,10 +230,20 @@ export default function ShortsScreen({ navigation, onBackToVideos }: any) {
             हमारे न्यूज़ डेस्क द्वारा 60 सेकंड के तेज़ न्यूज़ अपडेट्स और रील्स जल्द ही यहाँ जोड़े जाएंगे।
           </Text>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={handleBack} activeOpacity={0.8}>
-            <Ionicons name="play-circle-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-            <Text style={styles.actionBtnText}>News Videos देखें</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 }}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => feed.refresh()} activeOpacity={0.8}>
+              <Ionicons name="refresh" size={18} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.actionBtnText}>रिफ्रेश करें</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: isDark ? '#334155' : '#475569' }]}
+              onPress={handleBack}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="play-circle-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.actionBtnText}>News Videos</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     )
@@ -161,7 +268,14 @@ export default function ShortsScreen({ navigation, onBackToVideos }: any) {
         snapToInterval={height}
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         onMomentumScrollEnd={(e) => setActiveIndex(Math.round(e.nativeEvent.contentOffset.y / height))}
+        windowSize={3}
+        maxToRenderPerBatch={2}
+        removeClippedSubviews={Platform.OS === 'android'}
         renderItem={({ item, index }) => (
           <ReelItem item={item} active={index === activeIndex} onLike={() => onLike(item)} />
         )}

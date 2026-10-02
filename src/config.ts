@@ -1,6 +1,11 @@
 import { Platform } from 'react-native'
 
-const RAW_API_BASE = process.env.EXPO_PUBLIC_API_BASE || 'https://api.aarambhnews.online'
+const DEFAULT_API_BASE =
+  typeof window !== 'undefined' &&
+  (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')
+    ? 'http://localhost:5000'
+    : 'https://api.aarambhnews.online'
+const RAW_API_BASE = process.env.EXPO_PUBLIC_API_BASE || DEFAULT_API_BASE
 export const API_BASE = RAW_API_BASE.replace(/\/+$/, '')
 export const API_URL = `${API_BASE}/api/v1`
 
@@ -16,10 +21,12 @@ export function getApiUrl() {
   return API_URL
 }
 
+export const DEFAULT_COVER_IMAGE = `${API_BASE}/uploads/default-cover.png`;
+
 export function mediaUrl(path?: string) {
-  if (!path) return undefined
-  if (path.startsWith('http')) return path
-  return `${API_BASE}${path}`
+  if (!path || path.includes('unsplash.com/photo-')) return DEFAULT_COVER_IMAGE;
+  if (path.startsWith('http')) return path;
+  return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
 // AdMob — see AdBanner.tsx. Real IDs live in app.json; these constants can be

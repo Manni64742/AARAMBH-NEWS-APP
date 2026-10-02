@@ -150,6 +150,14 @@ export const liveStreamApi = {
       return [] as LiveStreamItem[]
     }
   },
+  recordView: async (id: string) => {
+    try {
+      if (!id) return null
+      return (await client.post<ApiResponse<any>>(`/live-streams/${id}/view`)).data.data
+    } catch {
+      return null
+    }
+  },
 }
 
 export const locationApi = {

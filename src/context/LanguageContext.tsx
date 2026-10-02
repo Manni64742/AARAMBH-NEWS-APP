@@ -40,7 +40,7 @@ interface LanguageContextValue {
   completeLanguageOnboarding: (lang: AppLanguage) => Promise<void>
 }
 
-const LanguageContext = createContext<LanguageContextValue | undefined>(undefined)
+export const LanguageContext = createContext<LanguageContextValue | undefined>(undefined)
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguageState] = useState<AppLanguage>('hi')

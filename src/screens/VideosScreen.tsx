@@ -319,6 +319,18 @@ export default function VideosScreen({ navigation }: any) {
               Shorts / Reels
             </Text>
           </Pressable>
+          <Pressable
+            style={[
+              styles.segmentItem,
+              { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+            ]}
+            onPress={() => navigation.navigate('LiveNews')}
+          >
+            <View style={styles.livePulseDot} />
+            <Text style={[styles.segmentText, { color: themeColors.textMuted }]}>
+              Live
+            </Text>
+          </Pressable>
         </View>
 
         {/* Video Filter Chips */}
@@ -373,7 +385,13 @@ const styles = StyleSheet.create({
     padding: 3,
   },
   segmentItem: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderRadius: radius.sm },
-  segmentText: { fontFamily: fonts.inter[600], fontSize: 13 },
+  segmentText: { fontFamily: fonts.inter[600], fontSize: 12.5 },
+  livePulseDot: {
+    width: 6.5,
+    height: 6.5,
+    borderRadius: 3.5,
+    backgroundColor: '#FF3B30',
+  },
   typeListWrap: {
     paddingVertical: 6,
   },

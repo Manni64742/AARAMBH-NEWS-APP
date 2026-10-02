@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { StyleSheet, View, Pressable, Linking, Platform } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { Ionicons } from '@expo/vector-icons'
@@ -8,6 +8,8 @@ import { videoIdFromUrl } from '../utils/youtube'
 interface YouTubePlayerProps {
   videoId: string
   showOpenButton?: boolean
+  autoplay?: boolean
+  active?: boolean
 }
 
 /**
@@ -21,9 +23,53 @@ interface YouTubePlayerProps {
  * 4. Omits forged Chrome userAgent so Android WebView passes Google Media Integrity & Client Hints checks.
  * 5. Handles embed errors and provides instant 1-tap fallback to the YouTube app.
  */
-export function YouTubePlayer({ videoId, showOpenButton = false }: YouTubePlayerProps) {
+export function YouTubePlayer({
+  videoId,
+  showOpenButton = false,
+  autoplay = true,
+  active = true,
+}: YouTubePlayerProps) {
   const [loadError, setLoadError] = useState(false)
+  const webViewRef = useRef<WebView>(null)
   const cleanId = videoIdFromUrl(videoId) || videoId?.trim()
+
+  useEffect(() => {
+    if (!active) {
+      const pauseScript = `
+        try {
+          var p = document.getElementById('ytplayer');
+          if (p && p.contentWindow) {
+            p.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+          }
+        } catch(e) {}
+      `
+      webViewRef.current?.injectJavaScript(pauseScript)
+    } else {
+      const playScript = `
+        try {
+          var p = document.getElementById('ytplayer');
+          if (p && p.contentWindow) {
+            p.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+          }
+        } catch(e) {}
+      `
+      webViewRef.current?.injectJavaScript(playScript)
+    }
+  }, [active])
+
+  useEffect(() => {
+    return () => {
+      const stopScript = `
+        try {
+          var p = document.getElementById('ytplayer');
+          if (p && p.contentWindow) {
+            p.contentWindow.postMessage('{"event":"command","func":"stopVideo","args":""}', '*');
+          }
+        } catch(e) {}
+      `
+      webViewRef.current?.injectJavaScript(stopScript)
+    }
+  }, [])
 
   const openInYouTube = () => {
     if (!cleanId) return
@@ -76,7 +122,7 @@ export function YouTubePlayer({ videoId, showOpenButton = false }: YouTubePlayer
   <div class="video-wrapper">
     <iframe
       id="ytplayer"
-      src="https://www.youtube.com/embed/${cleanId}?autoplay=1&playsinline=1&enablejsapi=1&rel=0&modestbranding=1&origin=https://aarambhnews.com"
+      src="https://www.youtube.com/embed/${cleanId}?autoplay=${autoplay ? '1' : '0'}&playsinline=1&enablejsapi=1&rel=0&modestbranding=1&origin=https://aarambhnews.com"
       title="Aarambh News Player"
       frameborder="0"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -115,6 +161,7 @@ export function YouTubePlayer({ videoId, showOpenButton = false }: YouTubePlayer
   return (
     <View style={styles.container}>
       <WebView
+        ref={webViewRef}
         source={{
           html: htmlContent,
           baseUrl: 'https://aarambhnews.com',

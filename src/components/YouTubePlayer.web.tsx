@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef, useEffect } from 'react'
 import { StyleSheet, View, Pressable, Linking } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { ScaledText as Text } from './ScaledText'
@@ -7,10 +7,44 @@ import { videoIdFromUrl } from '../utils/youtube'
 interface YouTubePlayerProps {
   videoId: string
   showOpenButton?: boolean
+  autoplay?: boolean
+  active?: boolean
 }
 
-export function YouTubePlayer({ videoId, showOpenButton = false }: YouTubePlayerProps) {
+export function YouTubePlayer({
+  videoId,
+  showOpenButton = false,
+  autoplay = true,
+  active = true,
+}: YouTubePlayerProps) {
+  const iframeRef = useRef<HTMLIFrameElement>(null)
   const cleanId = videoIdFromUrl(videoId) || videoId?.trim()
+
+  useEffect(() => {
+    if (!iframeRef.current || !iframeRef.current.contentWindow) return
+    if (!active) {
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: 'pauseVideo', args: '' }),
+        '*'
+      )
+    } else {
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: 'playVideo', args: '' }),
+        '*'
+      )
+    }
+  }, [active])
+
+  useEffect(() => {
+    return () => {
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'stopVideo', args: '' }),
+          '*'
+        )
+      }
+    }
+  }, [])
 
   const openInYouTube = () => {
     if (!cleanId) return
@@ -34,7 +68,8 @@ export function YouTubePlayer({ videoId, showOpenButton = false }: YouTubePlayer
   return (
     <View style={styles.container}>
       {React.createElement('iframe', {
-        src: `https://www.youtube.com/embed/${cleanId}?autoplay=0&playsinline=1&enablejsapi=1&rel=0&modestbranding=1&origin=${typeof window !== 'undefined' ? window.location.origin : 'https://aarambhnews.com'}`,
+        ref: iframeRef,
+        src: `https://www.youtube.com/embed/${cleanId}?autoplay=${autoplay ? '1' : '0'}&playsinline=1&enablejsapi=1&rel=0&modestbranding=1&origin=${typeof window !== 'undefined' ? window.location.origin : 'https://aarambhnews.com'}`,
         title: 'Aarambh News Player',
         style: { width: '100%', height: '100%', border: 0 },
         allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
