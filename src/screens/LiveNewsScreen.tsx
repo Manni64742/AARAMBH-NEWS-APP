@@ -17,6 +17,7 @@ import { contentApi, liveStreamApi } from '../api/endpoints'
 import { ContentItem, LiveStreamItem } from '../types'
 import { colors, fonts, fontFor, radius, spacing } from '../theme'
 import { useTheme } from '../context/ThemeContext'
+import { useLocation } from '../context/LocationContext'
 import { ScaledText as Text } from '../components/ScaledText'
 import { EmptyState, ErrorState, SkeletonCard } from '../components/States'
 import { AppBackButton } from '../components/AppBackButton'
@@ -59,6 +60,7 @@ const STATUS_LABEL: Record<string, { text: string; color: string }> = {
 
 export default function LiveNewsScreen({ navigation, route }: any) {
   const { colors: themeColors, isDark } = useTheme()
+  const { current: location } = useLocation()
   const insets = useSafeAreaInsets()
 
   const [items, setItems] = useState<LiveStreamItem[]>([])
@@ -73,9 +75,14 @@ export default function LiveNewsScreen({ navigation, route }: any) {
     setLoading(true)
     setError(null)
     try {
+      const locParams: Record<string, any> = {}
+      if (location?.state) locParams.state = location.state
+      if (location?.city) locParams.city = location.city
+      if (location?.district) locParams.district = location.district
+
       const [streamsRes, articlesRes] = await Promise.all([
-        liveStreamApi.list().catch(() => []),
-        contentApi.live().catch(() => ({ data: [] as ContentItem[] })),
+        liveStreamApi.list(locParams).catch(() => []),
+        contentApi.live(locParams).catch(() => ({ data: [] as ContentItem[] })),
       ])
       const sortedStreams = (streamsRes || []).sort((a: LiveStreamItem, b: LiveStreamItem) =>
         a.status === 'LIVE' ? -1 : 1
@@ -99,7 +106,7 @@ export default function LiveNewsScreen({ navigation, route }: any) {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [location?.state, location?.city, location?.district])
 
   // Open stream in dedicated YouTube Watch view
   const handleOpenStream = (stream: LiveStreamItem) => {

@@ -142,9 +142,9 @@ export const categoryApi = {
 }
 
 export const liveStreamApi = {
-  list: async () => {
+  list: async (params: Record<string, any> = {}) => {
     try {
-      return (await client.get<ApiResponse<LiveStreamItem[]>>('/live-streams')).data.data
+      return (await client.get<ApiResponse<LiveStreamItem[]>>('/live-streams', { params })).data.data
     } catch (err) {
       console.warn('Network error in liveStreamApi.list:', err)
       return [] as LiveStreamItem[]
