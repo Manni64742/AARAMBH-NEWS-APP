@@ -204,7 +204,7 @@ export default function VideosScreen({ navigation }: any) {
     async (page: number) => {
       let live: LiveStreamItem[] = []
       try {
-        live = await liveStreamApi.list()
+        live = await liveStreamApi.list({ language })
       } catch {
         // live is best-effort
       }

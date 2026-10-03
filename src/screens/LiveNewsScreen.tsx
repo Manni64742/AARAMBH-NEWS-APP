@@ -18,6 +18,7 @@ import { ContentItem, LiveStreamItem } from '../types'
 import { colors, fonts, fontFor, radius, spacing } from '../theme'
 import { useTheme } from '../context/ThemeContext'
 import { useLocation } from '../context/LocationContext'
+import { useLanguage } from '../context/LanguageContext'
 import { ScaledText as Text } from '../components/ScaledText'
 import { EmptyState, ErrorState, SkeletonCard } from '../components/States'
 import { AppBackButton } from '../components/AppBackButton'
@@ -61,6 +62,7 @@ const STATUS_LABEL: Record<string, { text: string; color: string }> = {
 export default function LiveNewsScreen({ navigation, route }: any) {
   const { colors: themeColors, isDark } = useTheme()
   const { current: location } = useLocation()
+  const { language } = useLanguage()
   const insets = useSafeAreaInsets()
 
   const [items, setItems] = useState<LiveStreamItem[]>([])
@@ -79,6 +81,7 @@ export default function LiveNewsScreen({ navigation, route }: any) {
       if (location?.state) locParams.state = location.state
       if (location?.city) locParams.city = location.city
       if (location?.district) locParams.district = location.district
+      if (language) locParams.language = language
 
       const [streamsRes, articlesRes] = await Promise.all([
         liveStreamApi.list(locParams).catch(() => []),
@@ -106,7 +109,7 @@ export default function LiveNewsScreen({ navigation, route }: any) {
 
   useEffect(() => {
     load()
-  }, [location?.state, location?.city, location?.district])
+  }, [location?.state, location?.city, location?.district, language])
 
   // Open stream in dedicated YouTube Watch view
   const handleOpenStream = (stream: LiveStreamItem) => {
