@@ -16,7 +16,10 @@ export default function EkycScreen() {
   const [idProofType, setIdProofType] = useState('AADHAAR')
   const [idProofNumber, setIdProofNumber] = useState('')
   const [documentUrl, setDocumentUrl] = useState<string | null>(null)
+  const [documentBackUrl, setDocumentBackUrl] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [uploadingFront, setUploadingFront] = useState(false)
+  const [uploadingBack, setUploadingBack] = useState(false)
   const [kycStatus, setKycStatus] = useState<string | null>(null)
   const [kycRequired, setKycRequired] = useState(false)
 
@@ -40,27 +43,55 @@ export default function EkycScreen() {
   const isSubmitted = kycStatus === 'SUBMITTED'
   const needKyc = kycRequired && !isVerified
 
-  const pickDocument = async () => {
+  const pickFrontDocument = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 })
     if (result.canceled || !result.assets?.[0]) return
     const file = result.assets[0]
+    setUploadingFront(true)
     try {
-      const res = await mediaApi.upload({ uri: file.uri, name: file.fileName || 'id-doc.jpg', type: file.mimeType || 'image/jpeg' })
+      const res = await mediaApi.upload({ uri: file.uri, name: file.fileName || 'id-doc-front.jpg', type: file.mimeType || 'image/jpeg' })
       setDocumentUrl(res.url)
-      success('Document uploaded')
+      success(idProofType === 'AADHAAR' ? 'Aadhaar Front uploaded ✓' : 'Document Front uploaded ✓')
     } catch (e) {
       error(errorMessage(e))
+    } finally {
+      setUploadingFront(false)
+    }
+  }
+
+  const pickBackDocument = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 })
+    if (result.canceled || !result.assets?.[0]) return
+    const file = result.assets[0]
+    setUploadingBack(true)
+    try {
+      const res = await mediaApi.upload({ uri: file.uri, name: file.fileName || 'id-doc-back.jpg', type: file.mimeType || 'image/jpeg' })
+      setDocumentBackUrl(res.url)
+      success(idProofType === 'AADHAAR' ? 'Aadhaar Back uploaded ✓' : 'Document Back uploaded ✓')
+    } catch (e) {
+      error(errorMessage(e))
+    } finally {
+      setUploadingBack(false)
     }
   }
 
   const submit = async () => {
-    if (!idProofNumber.trim() || !documentUrl) {
-      error('Fill ID number and upload document')
+    if (!idProofNumber.trim()) {
+      error('ID number is required')
+      return
+    }
+    if (!documentUrl) {
+      error(idProofType === 'AADHAAR' ? 'Aadhaar Front side image is required' : 'Document front side is required')
       return
     }
     setBusy(true)
     try {
-      await reporterApi.submitEkyc({ idProofType, idProofNumber: idProofNumber.trim(), idProofDocumentUrl: documentUrl })
+      await reporterApi.submitEkyc({
+        idProofType,
+        idProofNumber: idProofNumber.trim(),
+        idProofDocumentUrl: documentUrl,
+        idProofBackDocumentUrl: documentBackUrl || undefined,
+      })
       success('eKYC submitted for verification')
       loadKycStatus()
     } catch (e) {
@@ -136,11 +167,56 @@ export default function EkycScreen() {
       <Text style={[styles.label, { color: colors.text }]}>ID Number</Text>
       <TextInput style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]} value={idProofNumber} onChangeText={setIdProofNumber} placeholder="ID number" placeholderTextColor={colors.textLight} />
 
-      <Text style={[styles.label, { color: colors.text }]}>Document Image</Text>
-      <Pressable style={[styles.uploadBtn, { backgroundColor: colors.primarySoft, borderColor: colors.primary }]} onPress={pickDocument}>
-        <Text style={styles.uploadText}>{documentUrl ? 'Document uploaded ✓ (tap to change)' : 'Upload document image'}</Text>
+      {/* Aadhaar hint */}
+      {idProofType === 'AADHAAR' && (
+        <View style={[styles.hintBox, { backgroundColor: colors.primarySoft, borderColor: colors.primary }]}>
+          <Text style={[styles.hintText, { color: colors.primary }]}>
+            📋 Aadhaar Card ke dono taraf (Front aur Back) ki clear photo upload karein. Front mein photo aur Aadhaar number, Back mein address aur QR code hona chahiye.
+          </Text>
+        </View>
+      )}
+
+      {/* FRONT SIDE */}
+      <Text style={[styles.label, { color: colors.text }]}>
+        {idProofType === 'AADHAAR' ? 'Aadhaar Front Side (सामने का पृष्ठ) *' : 'Document Front Side *'}
+      </Text>
+      <Pressable
+        style={[
+          styles.uploadBtn,
+          { backgroundColor: colors.primarySoft, borderColor: documentUrl ? '#10B981' : colors.primary },
+          documentUrl && { backgroundColor: 'rgba(16,185,129,0.08)' },
+        ]}
+        onPress={pickFrontDocument}
+        disabled={uploadingFront}
+      >
+        <Text style={[styles.uploadText, { color: documentUrl ? '#059669' : colors.primary }]}>
+          {uploadingFront ? 'Uploading front...' : documentUrl ? '✓ Front uploaded (tap to change)' : idProofType === 'AADHAAR' ? 'Upload Aadhaar Front Side' : 'Upload Front Side'}
+        </Text>
       </Pressable>
       {documentUrl ? <Image source={{ uri: mediaUrl(documentUrl) }} style={styles.preview} /> : null}
+
+      {/* BACK SIDE */}
+      <Text style={[styles.label, { color: colors.text }]}>
+        {idProofType === 'AADHAAR'
+          ? 'Aadhaar Back Side (पीछे का पृष्ठ / पता) *'
+          : idProofType === 'PAN'
+          ? 'Document Back Side (Optional)'
+          : 'Document Back Side (Optional)'}
+      </Text>
+      <Pressable
+        style={[
+          styles.uploadBtn,
+          { backgroundColor: colors.primarySoft, borderColor: documentBackUrl ? '#10B981' : colors.primary },
+          documentBackUrl && { backgroundColor: 'rgba(16,185,129,0.08)' },
+        ]}
+        onPress={pickBackDocument}
+        disabled={uploadingBack}
+      >
+        <Text style={[styles.uploadText, { color: documentBackUrl ? '#059669' : colors.primary }]}>
+          {uploadingBack ? 'Uploading back...' : documentBackUrl ? '✓ Back uploaded (tap to change)' : idProofType === 'AADHAAR' ? 'Upload Aadhaar Back Side' : 'Upload Back Side'}
+        </Text>
+      </Pressable>
+      {documentBackUrl ? <Image source={{ uri: mediaUrl(documentBackUrl) }} style={styles.preview} /> : null}
 
       <Pressable style={[styles.btn, busy && styles.btnDisabled, { backgroundColor: colors.primary }]} onPress={submit} disabled={busy}>
         <Text style={styles.btnText}>{busy ? 'Submitting...' : 'Submit eKYC'}</Text>
@@ -223,5 +299,16 @@ const styles = StyleSheet.create({
   approvedSub: {
     fontSize: 12,
     lineHeight: 17,
+  },
+  hintBox: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  hintText: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '500',
   },
 })
