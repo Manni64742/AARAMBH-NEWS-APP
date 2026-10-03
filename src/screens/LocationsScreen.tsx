@@ -6,6 +6,7 @@ import { contentApi, locationApi } from '../api/endpoints'
 import { ContentItem, LocationItem } from '../types'
 import { colors, fonts, radius, spacing } from '../theme'
 import { useTheme } from '../context/ThemeContext'
+import { useLanguage } from '../context/LanguageContext'
 import { ScaledText as Text } from '../components/ScaledText'
 import { ErrorState, SkeletonCard } from '../components/States'
 import { NewsCard } from '../components/NewsCard'
@@ -13,6 +14,7 @@ import { AppBackButton } from '../components/AppBackButton'
 
 export default function LocationsScreen({ navigation }: any) {
   const { colors: themeColors, isDark } = useTheme()
+  const { language } = useLanguage()
   const insets = useSafeAreaInsets()
   const [states, setStates] = useState<LocationItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -87,6 +89,7 @@ export default function LocationsScreen({ navigation }: any) {
       if (type === 'state') params.state = name
       else if (type === 'district') params.district = name
       else params.city = name
+      if (language) params.language = language
       const res = await contentApi.list(params)
       setNews(res.data)
     } catch {

@@ -577,14 +577,18 @@ Promise.all([
   }, [location?.city, activeCategory, isMarket, language])
 
   useEffect(() => {
+    const params: Record<string, any> = { language }
+    if (location?.state) params.state = location.state
+    if (location?.city) params.city = location.city
+    if (location?.district) params.district = location.district
     liveStreamApi
-      .list()
+      .list(params)
       .then((r) => {
         const live = (r || []).filter((s: LiveStreamItem) => s.status !== 'ENDED')
         setLiveStreams(live)
       })
       .catch(() => setLiveStreams([]))
-  }, [])
+  }, [language, location?.state, location?.city, location?.district])
 
   const openNews = (item: ContentItem) => navigation.navigate('NewsDetail', { item })
   const handleBookmark = (id: string) => {

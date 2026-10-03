@@ -10,11 +10,13 @@ import { EmptyState, SkeletonCard } from '../components/States'
 import { ScaledText as Text } from '../components/ScaledText'
 import { AppBackButton } from '../components/AppBackButton'
 import { useTheme } from '../context/ThemeContext'
+import { useLanguage } from '../context/LanguageContext'
 
 const FILTERS = ['All', 'News', 'Videos', 'Shorts', 'Reporters', 'Locations', 'Categories']
 
 export default function SearchScreen({ navigation }: any) {
   const { colors: themeColors, isDark } = useTheme()
+  const { language } = useLanguage()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All')
   const [results, setResults] = useState<ContentItem[]>([])
@@ -38,6 +40,7 @@ export default function SearchScreen({ navigation }: any) {
     try {
       const params: Record<string, any> = { status: 'PUBLISHED', limit: 30 }
       if (filter === 'Videos' || filter === 'Shorts') params.contentType = filter === 'Videos' ? 'VIDEO' : 'SHORT_VIDEO'
+      if (language) params.language = language
       params.search = q
 
       const [contentRes, locRes] = await Promise.all([

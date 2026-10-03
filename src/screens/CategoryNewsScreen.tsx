@@ -7,11 +7,13 @@ import { NewsCard } from '../components/NewsCard'
 import { EmptyState, ErrorState, SkeletonCard } from '../components/States'
 import { usePagedFeed } from '../hooks/usePagedFeed'
 import { useTheme } from '../context/ThemeContext'
+import { useLanguage } from '../context/LanguageContext'
 import { ScaledText as Text } from '../components/ScaledText'
 import { CategoryItem } from '../types'
 
 export default function CategoryNewsScreen({ navigation }: any) {
   const { colors: themeColors } = useTheme()
+  const { language } = useLanguage()
   const route = useRoute() as any
   const { categoryId, subCategoryId: initialSubId, title } = route.params
   const [subcategories, setSubcategories] = useState<CategoryItem[]>([])
@@ -31,10 +33,11 @@ export default function CategoryNewsScreen({ navigation }: any) {
     async (page: number) => {
       const params: Record<string, any> = { page, limit: 15, status: 'PUBLISHED', category: categoryId }
       if (activeSub) params.subCategory = activeSub
+      if (language) params.language = language
       const res = await contentApi.list(params)
       return { data: res.data, pagination: res.pagination }
     },
-    [categoryId, activeSub]
+    [categoryId, activeSub, language]
   )
 
   const feed = usePagedFeed({ load })

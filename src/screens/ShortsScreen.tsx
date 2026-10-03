@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Dimensions, FlatList, Platform, Pressable, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native'
 import { ScaledText as Text } from '../components/ScaledText'
 import { useTheme } from '../context/ThemeContext'
+import { useLanguage } from '../context/LanguageContext'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { Image } from 'expo-image'
@@ -117,8 +118,9 @@ function ReelItem({ item, active, onLike }: { item: ContentItem; active: boolean
 
 export default function ShortsScreen({ navigation, onBackToVideos }: any) {
   const { colors: tc, isDark } = useTheme()
+  const { language } = useLanguage()
   const load = useCallback(async (page: number) => {
-    const res = await contentApi.list({ page, limit: 10, status: 'PUBLISHED', contentType: 'SHORT_VIDEO' })
+    const res = await contentApi.list({ page, limit: 10, status: 'PUBLISHED', contentType: 'SHORT_VIDEO', language })
     const list = Array.isArray(res) ? res : (res?.data || [])
     // Strict filter: ONLY real short videos with a video URL or YouTube ID
     const valid = list.filter(
@@ -135,7 +137,7 @@ export default function ShortsScreen({ navigation, onBackToVideos }: any) {
         )
     )
     return { data: valid, pagination: res.pagination }
-  }, [])
+  }, [language])
 
   const feed = usePagedFeed({ load })
   const [activeIndex, setActiveIndex] = useState(0)

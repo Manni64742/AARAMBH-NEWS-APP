@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react'
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { ScaledText as Text } from '../components/ScaledText'
 import { useTheme } from '../context/ThemeContext'
+import { useLanguage } from '../context/LanguageContext'
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
 import { Ionicons } from '@expo/vector-icons'
 import { contentApi } from '../api/endpoints'
@@ -39,11 +40,12 @@ function PlayerBar({ item, onClose }: { item: ContentItem; onClose: () => void }
 
 export default function AudioPlayerScreen({ navigation }: any) {
   const { colors } = useTheme()
+  const { language } = useLanguage()
   const [playing, setPlaying] = useState<ContentItem | null>(null)
   const load = useCallback(async (page: number) => {
-    const res = await contentApi.list({ page, limit: 20, status: 'PUBLISHED', contentType: 'AUDIO' })
+    const res = await contentApi.list({ page, limit: 20, status: 'PUBLISHED', contentType: 'AUDIO', language })
     return { data: res.data, pagination: res.pagination }
-  }, [])
+  }, [language])
   const feed = usePagedFeed({ load })
 
   return (
