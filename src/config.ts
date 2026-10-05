@@ -1,12 +1,10 @@
 import { Platform } from 'react-native'
 
-const DEFAULT_API_BASE =
-  typeof window !== 'undefined' &&
-  (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')
-    ? 'http://localhost:5000'
-    : 'https://api.aarambhnews.online'
-const RAW_API_BASE = process.env.EXPO_PUBLIC_API_BASE || DEFAULT_API_BASE
-export const API_BASE = RAW_API_BASE.replace(/\/+$/, '')
+const envBase = process.env.EXPO_PUBLIC_API_BASE?.trim()
+export const API_BASE = (envBase && !envBase.includes('localhost') && !envBase.includes('127.0.0.1')
+  ? envBase
+  : 'https://api.aarambhnews.online'
+).replace(/\/+$/, '')
 export const API_URL = `${API_BASE}/api/v1`
 
 export const APP_NAME = 'Aarambh News'
