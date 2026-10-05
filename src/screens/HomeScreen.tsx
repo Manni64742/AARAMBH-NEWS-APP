@@ -604,22 +604,32 @@ Promise.all([
 
   const byPublishedDesc = (a: ContentItem, b: ContentItem) =>
     new Date(b.publishedAt || b.createdAt || 0).getTime() - new Date(a.publishedAt || a.createdAt || 0).getTime()
-  const breakingItems = validBreaking.length > 0 ? validBreaking : [...validFeedBreaking].sort(byPublishedDesc)
+  const breakingItems = (validBreaking.length > 0 ? validBreaking : validFeedBreaking).sort(byPublishedDesc)
 
-  /* Featured stories prioritized for top hero slider */
-  const featuredFeedItems = validFeedItems.filter((i) => i.flags?.isFeatured || i.flags?.isBreaking)
-  const nonFeaturedFeedItems = validFeedItems.filter((i) => !i.flags?.isFeatured)
+  /* Ensure feed items and featured items are strictly sorted newest first */
+  const sortedFeedItems = [...validFeedItems].sort(byPublishedDesc)
+  const featuredFeedItems = sortedFeedItems.filter((i) => i.flags?.isFeatured || i.flags?.isBreaking)
+  const nonFeaturedFeedItems = sortedFeedItems.filter((i) => !i.flags?.isFeatured)
 
-  /* Slider headlines: prioritize featured articles & newest published article */
-  const newestItem = featuredFeedItems[0] || validFeedItems[0]
+  /* Slider headlines: newest published article strictly leads */
+  const newestItem = sortedFeedItems[0] || featuredFeedItems[0]
   const otherHeadlines = featuredFeedItems
-    .slice(1)
-    .concat(validTrending.length > 0 ? validTrending : [])
-    .concat(nonFeaturedFeedItems)
+    .filter((i) => !newestItem || i._id !== newestItem._id)
+    .concat(nonFeaturedFeedItems.filter((i) => !newestItem || i._id !== newestItem._id))
+    .concat(validTrending)
     .concat(validCatHeadlines)
     .filter((i) => i && i._id && (!newestItem || i._id !== newestItem._id))
 
-  const rawHeadlines = (newestItem ? [newestItem, ...otherHeadlines] : otherHeadlines).slice(0, 6)
+  const seenIds = new Set<string>()
+  if (newestItem && newestItem._id) seenIds.add(String(newestItem._id))
+  const dedupedOthers = otherHeadlines.filter((item) => {
+    const id = String(item._id)
+    if (seenIds.has(id)) return false
+    seenIds.add(id)
+    return true
+  })
+
+  const rawHeadlines = (newestItem ? [newestItem, ...dedupedOthers] : dedupedOthers).slice(0, 6)
 
   const headlines = rawHeadlines.length >= 2
     ? rawHeadlines
