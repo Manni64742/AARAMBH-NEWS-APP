@@ -7,12 +7,44 @@ import { fonts, radius, spacing } from '../theme'
 import { ScaledText as Text } from './ScaledText'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
+import { APP_LOGO, mediaUrl } from '../config'
 
 interface BundleCardProps {
   bundle: BundleCardData
   isSingle?: boolean
   onItemPress: (item: BundleNewsItem) => void
   onViewMore: () => void
+}
+
+const BundleThumbnail: React.FC<{ imageUrl?: string; tc: any }> = ({ imageUrl, tc }) => {
+  const [error, setError] = React.useState(false)
+  const thumbUrl = mediaUrl(imageUrl)
+
+  React.useEffect(() => {
+    setError(false)
+  }, [imageUrl])
+
+  if (!thumbUrl || error) {
+    return (
+      <View style={[styles.thumbnail, { backgroundColor: tc.surfaceContainer, borderColor: tc.border, alignItems: 'center', justifyContent: 'center', padding: 6 }]}>
+        <Image
+          source={APP_LOGO}
+          style={styles.thumbLogo}
+          contentFit="contain"
+        />
+      </View>
+    )
+  }
+
+  return (
+    <Image
+      source={{ uri: thumbUrl }}
+      style={[styles.thumbnail, { backgroundColor: tc.surfaceVariant, borderColor: tc.border }]}
+      contentFit="cover"
+      transition={200}
+      onError={() => setError(true)}
+    />
+  )
 }
 
 export const BundleCard: React.FC<BundleCardProps> = ({ bundle, isSingle = false, onItemPress, onViewMore }) => {
@@ -108,12 +140,7 @@ export const BundleCard: React.FC<BundleCardProps> = ({ bundle, isSingle = false
               </View>
 
               {/* Right Thumbnail */}
-              <Image
-                source={{ uri: item.imageUrl }}
-                style={[styles.thumbnail, { backgroundColor: tc.surfaceVariant, borderColor: tc.border }]}
-                contentFit="cover"
-                transition={200}
-              />
+              <BundleThumbnail imageUrl={item.imageUrl} tc={tc} />
             </Pressable>
           )
         })}
@@ -199,5 +226,10 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: radius.md,
     borderWidth: 0.5,
+    overflow: 'hidden',
+  },
+  thumbLogo: {
+    width: '80%',
+    height: '80%',
   },
 })

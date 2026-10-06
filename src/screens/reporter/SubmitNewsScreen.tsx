@@ -127,6 +127,17 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
   const [sendPushNotification, setSendPushNotification] = useState(Boolean(initialFlags.sendPushNotification))
   const [showEditorialOptions, setShowEditorialOptions] = useState(false)
 
+  const hasVideo =
+    contentType === 'VIDEO' ||
+    Boolean(mediaUrlState?.kind === 'VIDEO' || mediaUrlState?.kind === 'SHORT_VIDEO') ||
+    blocks.some((b) => (b.type === 'VIDEO' || b.type === 'YOUTUBE') && Boolean(b.url?.trim()))
+
+  useEffect(() => {
+    if (!hasVideo && isLiveCoverage) {
+      setIsLiveCoverage(false)
+    }
+  }, [hasVideo, isLiveCoverage])
+
   const [busy, setBusy] = useState(false)
   const draftKey = `aarambh_article_draft_${user?._id || 'anon'}`
   const saveTimer = useRef<any>(null)
@@ -316,7 +327,7 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
           isBreaking,
           isFeatured,
           isExclusive,
-          isLiveCoverage,
+          isLiveCoverage: hasVideo ? isLiveCoverage : false,
           priority,
           editorialTone,
           isSponsored,
@@ -794,24 +805,26 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
                 </Text>
               </Pressable>
 
-              <Pressable
-                style={[
-                  styles.editorialChip,
-                  { borderColor: colors.border, backgroundColor: colors.surfaceContainer },
-                  isLiveCoverage && { backgroundColor: '#E11D48', borderColor: '#E11D48' },
-                ]}
-                onPress={() => setIsLiveCoverage(!isLiveCoverage)}
-              >
-                <Text
+              {hasVideo ? (
+                <Pressable
                   style={[
-                    styles.editorialChipText,
-                    { color: colors.text },
-                    isLiveCoverage && { color: '#fff', fontWeight: '700' },
+                    styles.editorialChip,
+                    { borderColor: colors.border, backgroundColor: colors.surfaceContainer },
+                    isLiveCoverage && { backgroundColor: '#E11D48', borderColor: '#E11D48' },
                   ]}
+                  onPress={() => setIsLiveCoverage(!isLiveCoverage)}
                 >
-                  🔴 Live
-                </Text>
-              </Pressable>
+                  <Text
+                    style={[
+                      styles.editorialChipText,
+                      { color: colors.text },
+                      isLiveCoverage && { color: '#fff', fontWeight: '700' },
+                    ]}
+                  >
+                    🔴 Live
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
 
             {/* 2. Priority */}

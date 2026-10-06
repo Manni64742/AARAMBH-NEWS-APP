@@ -10,7 +10,7 @@ import { CategoryChip } from '../components/NewsCard'
 import { EmptyState, ErrorState, SkeletonCard } from '../components/States'
 import { usePagedFeed } from '../hooks/usePagedFeed'
 import { ScaledText as Text } from '../components/ScaledText'
-import { mediaUrl } from '../config'
+import { mediaUrl, APP_LOGO } from '../config'
 import ShortsScreen from './ShortsScreen'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -45,16 +45,28 @@ function formatDuration(sec?: number) {
 
 function MediaCard({ item }: { item: MediaCardItem }) {
   const { colors: tc, isDark } = useTheme()
+  const [thumbError, setThumbError] = useState(false)
   const thumb = mediaUrl(item.thumbnail)
   const duration = formatDuration(item.duration)
+
+  useEffect(() => {
+    setThumbError(false)
+  }, [item.thumbnail])
+
   return (
     <Pressable onPress={item.onPress} style={[styles.item, { backgroundColor: tc.card, borderColor: tc.border }]}>
       <View style={styles.thumbWrap}>
-        {thumb ? (
-          <Image source={{ uri: thumb }} style={styles.thumb} contentFit="cover" transition={150} />
+        {thumb && !thumbError ? (
+          <Image
+            source={{ uri: thumb }}
+            style={styles.thumb}
+            contentFit="cover"
+            transition={150}
+            onError={() => setThumbError(true)}
+          />
         ) : (
-          <View style={[styles.thumb, styles.thumbEmpty, { backgroundColor: tc.surfaceContainer }]}>
-            <Ionicons name="play-circle-outline" size={34} color={tc.textMuted} />
+          <View style={[styles.thumb, styles.thumbEmpty, { backgroundColor: tc.surfaceContainer, alignItems: 'center', justifyContent: 'center', padding: 8 }]}>
+            <Image source={APP_LOGO} style={{ width: '70%', height: '70%' }} contentFit="contain" />
           </View>
         )}
         {item.type === 'live' ? (

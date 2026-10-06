@@ -11,6 +11,35 @@ import { ScaledText as Text } from '../components/ScaledText'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
 import { AdBanner } from '../components/AdBanner'
+import { APP_LOGO, mediaUrl } from '../config'
+
+const CategoryCardThumbnail: React.FC<{ item: any; tc: any }> = ({ item, tc }) => {
+  const [error, setError] = useState(false)
+  const rawUrl = item.imageUrl || item.image || item.featuredImage?.url || item.featuredImage?.path
+  const thumbUrl = mediaUrl(rawUrl)
+
+  useEffect(() => {
+    setError(false)
+  }, [rawUrl])
+
+  if (!thumbUrl || error) {
+    return (
+      <View style={[styles.cardThumb, { backgroundColor: tc.surfaceContainer, alignItems: 'center', justifyContent: 'center', padding: 8, overflow: 'hidden' }]}>
+        <Image source={APP_LOGO} style={{ width: '80%', height: '80%' }} contentFit="contain" />
+      </View>
+    )
+  }
+
+  return (
+    <Image
+      source={{ uri: thumbUrl }}
+      style={[styles.cardThumb, { backgroundColor: tc.surfaceVariant, overflow: 'hidden' }]}
+      contentFit="cover"
+      transition={200}
+      onError={() => setError(true)}
+    />
+  )
+}
 
 export default function CategoryNewsListScreen({ route, navigation }: any) {
   const { colors: tc, isDark } = useTheme()
@@ -227,11 +256,7 @@ export default function CategoryNewsListScreen({ route, navigation }: any) {
                   </View>
 
                   {/* Thumbnail */}
-                  <Image
-                    source={{ uri: item.imageUrl }}
-                    style={[styles.cardThumb, { backgroundColor: tc.surfaceVariant }]}
-                    contentFit="cover"
-                  />
+                  <CategoryCardThumbnail item={item} tc={tc} />
                 </View>
               </Pressable>
               {index === 2 ? (

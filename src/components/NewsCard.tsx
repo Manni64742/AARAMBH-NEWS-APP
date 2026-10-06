@@ -4,7 +4,7 @@ import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { ContentItem } from '../types'
 import { colors, fonts, fontFor, radius, spacing } from '../theme'
-import { mediaUrl } from '../config'
+import { mediaUrl, APP_LOGO } from '../config'
 import { ScaledText as Text } from './ScaledText'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -47,10 +47,26 @@ export const NewsCard: React.FC<{
 }> = ({ item, onPress, compact, showThumb = true, onBookmark }) => {
   const { colors: tc, isDark } = useTheme()
   const { language } = useLanguage()
-  const image = mediaUrl(item.featuredImage?.url)
+  const [imgError, setImgError] = React.useState(false)
+  const rawImage =
+    item.featuredImage?.url ||
+    (item.featuredImage as any)?.path ||
+    (item as any).imageUrl ||
+    (item as any).image
+  const image = mediaUrl(rawImage)
+
+  React.useEffect(() => {
+    setImgError(false)
+  }, [rawImage])
+
   const titleFont = fontFor(item.title, 700)
   const summaryFont = fontFor(item.summary, 400)
   const isBreaking = item.flags?.isBreaking
+  const isVideoItem =
+    (item.contentType as any) === 'VIDEO' ||
+    item.contentType === 'SHORT_VIDEO' ||
+    item.contentType === 'LIVE_BLOG' ||
+    Boolean(item.videoPayload?.videoUrl || item.shortVideoPayload?.videoUrl || item.youtubeUrl || item.youtubeId)
 
   const categoryLabel =
     language === 'hi'
@@ -67,7 +83,7 @@ export const NewsCard: React.FC<{
               {categoryLabel}
             </Text>
           </View>
-          {item.flags?.isLiveCoverage ? (
+          {item.flags?.isLiveCoverage && isVideoItem ? (
             <View style={[styles.breakingBadge, { backgroundColor: '#E11D48' }]}>
               <View style={styles.breakingDotSmall} />
               <Text style={styles.breakingBadgeText}>🔴 LIVE</Text>
@@ -140,8 +156,24 @@ export const NewsCard: React.FC<{
       </View>
 
       {/* Thumbnail */}
-      {showThumb && image ? (
-        <Image source={{ uri: image }} style={styles.thumb} contentFit="cover" transition={200} />
+      {showThumb ? (
+        image && !imgError ? (
+          <Image
+            source={{ uri: image }}
+            style={styles.thumb}
+            contentFit="cover"
+            transition={200}
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <View style={[styles.thumb, { backgroundColor: tc.surfaceContainer, alignItems: 'center', justifyContent: 'center', padding: 6 }]}>
+            <Image
+              source={APP_LOGO}
+              style={{ width: '82%', height: '82%' }}
+              contentFit="contain"
+            />
+          </View>
+        )
       ) : null}
     </Pressable>
   )
@@ -153,16 +185,39 @@ export const HorizontalNewsCard: React.FC<{
   width?: number
 }> = ({ item, onPress, width = 300 }) => {
   const { colors: tc, isDark } = useTheme()
-  const image = mediaUrl(item.featuredImage?.url)
+  const [imgError, setImgError] = React.useState(false)
+  const rawImage =
+    item.featuredImage?.url ||
+    (item.featuredImage as any)?.path ||
+    (item as any).imageUrl ||
+    (item as any).image
+  const image = mediaUrl(rawImage)
+
+  React.useEffect(() => {
+    setImgError(false)
+  }, [rawImage])
+
   return (
     <Pressable
       onPress={onPress}
       style={[styles.hCard, { width, backgroundColor: tc.card, borderColor: tc.border }]}
     >
-      {image ? (
-        <Image source={{ uri: image }} style={styles.hImage} contentFit="cover" transition={200} />
+      {image && !imgError ? (
+        <Image
+          source={{ uri: image }}
+          style={styles.hImage}
+          contentFit="cover"
+          transition={200}
+          onError={() => setImgError(true)}
+        />
       ) : (
-        <View style={[styles.hImage, styles.hImageFallback]} />
+        <View style={[styles.hImage, { backgroundColor: tc.surfaceContainer, alignItems: 'center', justifyContent: 'center', padding: 12 }]}>
+          <Image
+            source={APP_LOGO}
+            style={{ width: '75%', height: '75%' }}
+            contentFit="contain"
+          />
+        </View>
       )}
       <View style={styles.hBody}>
         <View style={[styles.categoryBadgeWrap, { backgroundColor: isDark ? 'rgba(30, 58, 138, 0.35)' : '#EFF6FF', borderColor: isDark ? '#1E3A8A' : '#DBEAFE', alignSelf: 'flex-start', marginBottom: 5 }]}>

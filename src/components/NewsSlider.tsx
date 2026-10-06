@@ -4,7 +4,7 @@ import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { ContentItem } from '../types'
 import { colors, fonts, fontFor, radius, spacing } from '../theme'
-import { mediaUrl } from '../config'
+import { mediaUrl, APP_LOGO } from '../config'
 import { ScaledText as Text } from './ScaledText'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
@@ -16,6 +16,90 @@ const timeAgo = (iso?: string) => {
   const hrs = Math.floor(mins / 60)
   if (hrs < 24) return `${hrs}h`
   return `${Math.floor(hrs / 24)}d`
+}
+
+interface SliderCardItemProps {
+  item: ContentItem
+  cardWidth: number
+  tc: any
+  language: string
+  onPress: (item: ContentItem) => void
+}
+
+const SliderCardItem: React.FC<SliderCardItemProps> = ({
+  item,
+  cardWidth,
+  tc,
+  language,
+  onPress,
+}) => {
+  const [imgError, setImgError] = useState(false)
+  const rawImage =
+    item.featuredImage?.url ||
+    (item.featuredImage as any)?.path ||
+    (item as any)?.imageUrl ||
+    (item as any)?.image
+  const image = mediaUrl(rawImage)
+
+  useEffect(() => {
+    setImgError(false)
+  }, [rawImage])
+
+  return (
+    <Pressable
+      onPress={() => onPress(item)}
+      style={[styles.card, { width: cardWidth, backgroundColor: tc.card, borderColor: tc.border }]}
+    >
+      <View style={styles.imageWrap}>
+        {image && !imgError ? (
+          <Image
+            source={{ uri: image }}
+            style={styles.image}
+            contentFit="cover"
+            transition={250}
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <View style={[styles.image, { backgroundColor: tc.surfaceContainer, alignItems: 'center', justifyContent: 'center' }]}>
+            <Image source={APP_LOGO} style={{ width: '60%', height: '60%' }} contentFit="contain" />
+          </View>
+        )}
+        {item.flags?.isBreaking ? (
+          <View style={[styles.breakingBadge, { backgroundColor: tc.primary }]}>
+            <Ionicons name="flash" size={10} color="#fff" />
+            <Text style={styles.breakingText}>{language === 'hi' ? 'ब्रेकिंग' : 'BREAKING'}</Text>
+          </View>
+        ) : null}
+        <View style={styles.timeBadge}>
+          <Ionicons name="time-outline" size={11} color="#fff" />
+          <Text style={styles.timeText}>{timeAgo(item.publishedAt)}</Text>
+        </View>
+        <View style={styles.categoryBadge}>
+          <Text style={styles.categoryText}>
+            {language === 'hi'
+              ? (item.category?.name?.hi || item.category?.name?.en || 'समाचार')
+              : (item.category?.name?.en || item.category?.name?.hi || 'News')}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.body}>
+        <Text
+          style={[styles.headline, { color: tc.text, fontFamily: fontFor(item.title, 700) }]}
+          numberOfLines={2}
+        >
+          {item.title}
+        </Text>
+        {item.summary ? (
+          <Text
+            style={[styles.summary, { color: tc.textMuted, fontFamily: fontFor(item.summary, 400) }]}
+            numberOfLines={2}
+          >
+            {item.summary}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  )
 }
 
 export const NewsSlider: React.FC<{
@@ -79,53 +163,14 @@ export const NewsSlider: React.FC<{
         }}
         renderItem={({ item }) => {
           if (!item) return null
-          const image = mediaUrl(item.featuredImage?.url)
           return (
-            <Pressable
-              onPress={() => onPress(item)}
-              style={[styles.card, { width: cardWidth, backgroundColor: tc.card, borderColor: tc.border }]}
-            >
-              <View style={styles.imageWrap}>
-                {image ? (
-                  <Image source={{ uri: image }} style={styles.image} contentFit="cover" transition={250} />
-                ) : (
-                  <View style={[styles.image, { backgroundColor: tc.surfaceContainer }]} />
-                )}
-                {item.flags?.isBreaking ? (
-                  <View style={[styles.breakingBadge, { backgroundColor: tc.primary }]}>
-                    <Ionicons name="flash" size={10} color="#fff" />
-                    <Text style={styles.breakingText}>{language === 'hi' ? 'ब्रेकिंग' : 'BREAKING'}</Text>
-                  </View>
-                ) : null}
-                <View style={styles.timeBadge}>
-                  <Ionicons name="time-outline" size={11} color="#fff" />
-                  <Text style={styles.timeText}>{timeAgo(item.publishedAt)}</Text>
-                </View>
-                <View style={styles.categoryBadge}>
-                  <Text style={styles.categoryText}>
-                    {language === 'hi'
-                      ? (item.category?.name?.hi || item.category?.name?.en || 'समाचार')
-                      : (item.category?.name?.en || item.category?.name?.hi || 'News')}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.body}>
-                <Text
-                  style={[styles.headline, { color: tc.text, fontFamily: fontFor(item.title, 700) }]}
-                  numberOfLines={2}
-                >
-                  {item.title}
-                </Text>
-                {item.summary ? (
-                  <Text
-                    style={[styles.summary, { color: tc.textMuted, fontFamily: fontFor(item.summary, 400) }]}
-                    numberOfLines={2}
-                  >
-                    {item.summary}
-                  </Text>
-                ) : null}
-              </View>
-            </Pressable>
+            <SliderCardItem
+              item={item}
+              cardWidth={cardWidth}
+              tc={tc}
+              language={language}
+              onPress={onPress}
+            />
           )
         }}
       />

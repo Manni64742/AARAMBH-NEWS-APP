@@ -8,7 +8,7 @@ export const API_BASE = (envBase && !envBase.includes('localhost') && !envBase.i
 export const API_URL = `${API_BASE}/api/v1`
 
 export const APP_NAME = 'Aarambh News'
-export const APP_TAGLINE = 'Hyperlocal News App'
+export const APP_TAGLINE = 'Aaramb News App'
 
 export const SUPPORTED_LANGUAGES = [
   { code: 'hi', label: 'हिन्दी (Hindi)' },
@@ -19,10 +19,11 @@ export function getApiUrl() {
   return API_URL
 }
 
+export const APP_LOGO = require('../assets/aarambh_news_logo.png');
 export const DEFAULT_COVER_IMAGE = `${API_BASE}/uploads/default-cover.png`;
 
-export function mediaUrl(path?: string) {
-  if (!path || path.includes('unsplash.com/photo-')) return DEFAULT_COVER_IMAGE;
+export function mediaUrl(path?: string): string | undefined {
+  if (!path || path.includes('unsplash.com/photo-') || path.includes('default-cover.png')) return undefined;
   if (path.startsWith('http')) return path;
   return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
 }

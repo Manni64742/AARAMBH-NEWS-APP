@@ -27,7 +27,7 @@ import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import { ScaledText as Text } from '../components/ScaledText'
 import { useTheme } from '../context/ThemeContext'
-import { mediaUrl } from '../config'
+import { mediaUrl, APP_LOGO } from '../config'
 import { errorMessage } from '../api/client'
 import { NewsCard, SectionHeader } from '../components/NewsCard'
 import { AdBanner, showInterstitialIfEnabled } from '../components/AdBanner'
@@ -1066,10 +1066,38 @@ export default function NewsDetailScreen() {
     }
   }
 
+  const isVideoArticle = (item?.contentType as any) === 'VIDEO' || item?.contentType === 'SHORT_VIDEO'
   const ytVideoId = item ? (item.youtubeId || (item.youtubeUrl ? videoIdFromUrl(item.youtubeUrl) : null)) : null
-  const image = item ? mediaUrl(item.featuredImage?.url) : null
-  const videoSrc = item ? mediaUrl(item.shortVideoPayload?.videoUrl || item.videoPayload?.videoUrl) : null
+  const rawVideo = item?.shortVideoPayload?.videoUrl || item?.videoPayload?.videoUrl
+  const videoSrc = rawVideo ? mediaUrl(rawVideo) : null
   const videoPlayer = useVideoPlayer(item && videoSrc ? (videoSrc as any) : null)
+  const extractFirstBodyImage = (blocks?: any[], contentHtml?: string) => {
+    if (Array.isArray(blocks)) {
+      for (const b of blocks) {
+        if (b?.type === 'IMAGE' && (b?.data?.url || b?.data?.path)) {
+          return b.data.url || b.data.path
+        }
+      }
+    }
+    if (contentHtml && typeof contentHtml === 'string') {
+      const match = contentHtml.match(/<img[^>]+src=["']([^"']+)["']/i)
+      if (match && match[1]) return match[1]
+    }
+    return undefined
+  }
+
+  const rawImage =
+    item?.featuredImage?.url ||
+    (item?.featuredImage as any)?.path ||
+    (item as any)?.imageUrl ||
+    (item as any)?.image ||
+    extractFirstBodyImage(item?.bodyBlocks, (item as any)?.content)
+  const image = mediaUrl(rawImage)
+  const [heroImgError, setHeroImgError] = useState(false)
+
+  useEffect(() => {
+    setHeroImgError(false)
+  }, [rawImage])
 
   const insets = useSafeAreaInsets()
   const topInset = insets.top
@@ -1138,7 +1166,7 @@ export default function NewsDetailScreen() {
                 <Text style={styles.badgePillText}>EXCLUSIVE</Text>
               </View>
             ) : null}
-            {item.flags?.isLiveCoverage ? (
+            {item.flags?.isLiveCoverage && (isVideoArticle || Boolean(rawVideo) || Boolean(ytVideoId) || (item.contentType as any) === 'LIVE' || item.contentType === 'LIVE_BLOG') ? (
               <View style={[styles.badgePill, { backgroundColor: '#E11D48' }]}>
                 <Text style={styles.badgePillText}>🔴 LIVE</Text>
               </View>
@@ -1161,13 +1189,33 @@ export default function NewsDetailScreen() {
               </View>
             ) : null}
           </View>
-          {ytVideoId ? (
-            <View style={styles.ytHeroWrap}>
-              <YouTubePlayer videoId={ytVideoId} showOpenButton />
-            </View>
-          ) : videoSrc ? (
-            <VideoView player={videoPlayer} style={styles.hero} contentFit="contain" />
-          ) : image ? (
+          {isVideoArticle ? (
+            ytVideoId ? (
+              <View style={styles.ytHeroWrap}>
+                <YouTubePlayer videoId={ytVideoId} showOpenButton />
+              </View>
+            ) : videoSrc ? (
+              <VideoView player={videoPlayer} style={styles.hero} contentFit="contain" />
+            ) : image ? (
+              <View style={[styles.heroWrap, { backgroundColor: themeColors.surfaceContainer }]}>
+                <Image
+                  source={{ uri: image }}
+                  style={styles.hero}
+                  contentFit="cover"
+                  transition={150}
+                  priority="high"
+                />
+              </View>
+            ) : (
+              <View style={[styles.heroWrap, styles.logoFallbackWrap, { backgroundColor: themeColors.surfaceContainer }]}>
+                <Image
+                  source={APP_LOGO}
+                  style={styles.logoFallback}
+                  contentFit="contain"
+                />
+              </View>
+            )
+          ) : image && !heroImgError ? (
             <View style={[styles.heroWrap, { backgroundColor: themeColors.surfaceContainer }]}>
               <Image
                 source={{ uri: image }}
@@ -1175,6 +1223,7 @@ export default function NewsDetailScreen() {
                 contentFit="cover"
                 transition={150}
                 priority="high"
+                onError={() => setHeroImgError(true)}
               />
               {!captionVisible && (
                 <>
@@ -1211,7 +1260,21 @@ export default function NewsDetailScreen() {
                 </View>
               )}
             </View>
-          ) : null}
+          ) : ytVideoId ? (
+            <View style={styles.ytHeroWrap}>
+              <YouTubePlayer videoId={ytVideoId} showOpenButton />
+            </View>
+          ) : videoSrc ? (
+            <VideoView player={videoPlayer} style={styles.hero} contentFit="contain" />
+          ) : (
+            <View style={[styles.heroWrap, styles.logoFallbackWrap, { backgroundColor: themeColors.surfaceContainer }]}>
+              <Image
+                source={APP_LOGO}
+                style={styles.logoFallback}
+                contentFit="contain"
+              />
+            </View>
+          )}
 
           <NativeText style={[styles.title, { color: themeColors.text, fontFamily: fontFor(item.title, 700), fontSize: Math.round(26 * fontScale), lineHeight: Math.round(34 * fontScale) }]}>{item.title}</NativeText>
           {item.summary ? <NativeText style={[styles.summary, { color: themeColors.textMuted, fontFamily: fontFor(item.summary, 400), fontSize: Math.round(16.5 * fontScale), lineHeight: Math.round(25 * fontScale) }]}>{item.summary}</NativeText> : null}
@@ -1696,6 +1759,8 @@ const styles = StyleSheet.create({
   ytHeroWrap: { width: '100%', height: 230, borderRadius: 10, overflow: 'hidden', marginTop: 12, backgroundColor: '#000' },
   heroWrap: { position: 'relative', marginTop: 12, borderRadius: 10, overflow: 'hidden' },
   hero: { width: '100%', height: 250 },
+  logoFallbackWrap: { width: '100%', height: 220, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  logoFallback: { width: '75%', height: '75%' },
   heroControls: { position: 'absolute', right: 10, bottom: 10, backgroundColor: 'rgba(0,0,0,0.55)', padding: 4, borderRadius: 16 },
   heroControlBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   captionOverlay: {

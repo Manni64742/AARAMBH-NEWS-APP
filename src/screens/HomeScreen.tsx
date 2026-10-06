@@ -43,6 +43,7 @@ import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
 import { BundleCard } from '../components/BundleCard'
 import { TrendingRankedList } from '../components/TrendingRankedList'
+import { APP_LOGO, mediaUrl } from '../config'
 import {
   ThematicSectionData,
   bundleItemToContentItem,
@@ -52,6 +53,37 @@ import {
   TrendingRankItem,
   isOrangeTag,
 } from '../types/bundles'
+
+const ThumbWithLogoFallback: React.FC<{
+  imageUrl?: string
+  style: any
+  fallbackBg?: string
+}> = ({ imageUrl, style, fallbackBg }) => {
+  const [error, setError] = useState(false)
+  const thumbUrl = mediaUrl(imageUrl)
+
+  useEffect(() => {
+    setError(false)
+  }, [imageUrl])
+
+  if (!thumbUrl || error) {
+    return (
+      <View style={[style, { backgroundColor: fallbackBg || '#1e293b', alignItems: 'center', justifyContent: 'center', padding: 6, overflow: 'hidden' }]}>
+        <Image source={APP_LOGO} style={{ width: '80%', height: '80%' }} contentFit="contain" />
+      </View>
+    )
+  }
+
+  return (
+    <Image
+      source={{ uri: thumbUrl }}
+      style={style}
+      contentFit="cover"
+      transition={200}
+      onError={() => setError(true)}
+    />
+  )
+}
 
 /* ────── Breaking Ticker ────── */
 
@@ -857,7 +889,11 @@ Promise.all([
                         {item.publishedAt}
                       </Text>
                     </View>
-                    <Image source={{ uri: item.imageUrl }} style={styles.indiaThumb} contentFit="cover" />
+                    <ThumbWithLogoFallback
+                      imageUrl={item.imageUrl}
+                      style={styles.indiaThumb}
+                      fallbackBg={themeColors.surfaceContainer}
+                    />
                   </Pressable>
                 ))}
 
