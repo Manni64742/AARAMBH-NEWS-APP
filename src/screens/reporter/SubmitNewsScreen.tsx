@@ -35,6 +35,8 @@ import { useTheme } from '../../context/ThemeContext'
 import ArticleBlockEditor from '../../components/reporter/ArticleBlockEditor'
 import { ArticleWatermark } from '../../components/ArticleWatermark'
 import { AdaptiveImage } from '../../components/AdaptiveImage'
+import { YouTubePlayer } from '../../components/YouTubePlayer'
+import { videoIdFromUrl } from '../../utils/youtube'
 
 const TYPES: Array<{ key: ContentType; label: string }> = [
   { key: 'ARTICLE', label: 'Article' },
@@ -90,6 +92,8 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
   const { colors, isDark } = useTheme()
   const { current: gpsLocation } = useLocation()
   const { user } = useAuth()
+  const canDirectPublish = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN'
+  const targetPublishStatus = canDirectPublish ? 'PUBLISHED' : 'PENDING_REVIEW'
   const editing = !!(route?.params?.item)
   const item: ContentItem | undefined = route?.params?.item
 
@@ -273,7 +277,7 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
     setShowPreviewModal(true)
   }
 
-  const save = async (status: 'DRAFT' | 'PENDING_REVIEW') => {
+  const save = async (status: 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED') => {
     if (!title.trim() || title.trim().length < 5) {
       error('Title is required (minimum 5 characters)')
       return
@@ -285,7 +289,17 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
     }
     setBusy(true)
     try {
-      const bodyBlocks = blocks.map((b) => ({ ...b }))
+      const bodyBlocks = blocks.map((b) => {
+        if (b.type === 'YOUTUBE') {
+          const effectiveUrl = b.embedUrl || b.url || ''
+          return {
+            ...b,
+            embedUrl: effectiveUrl,
+            url: b.url || effectiveUrl,
+          }
+        }
+        return { ...b }
+      })
       const contentFallback = bodyBlocks
         .map((b) => {
           if (b.type === 'TEXT') return b.html || ''
@@ -296,6 +310,9 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
             if (b.tableData.headers) parts.push(b.tableData.headers.join(' | '))
             if (b.tableData.rows) b.tableData.rows.forEach((r) => parts.push(r.join(' | ')))
             return parts.join('\n')
+          }
+          if (b.type === 'YOUTUBE' || b.type === 'VIDEO') {
+            return [b.title, b.caption, b.embedUrl, b.url].filter(Boolean).join(' ')
           }
           return b.title || b.caption || ''
         })
@@ -965,7 +982,9 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
       </View>
 
       <Text style={[styles.note, { color: colors.textLight }]}>
-        Tap "Preview Article" to verify formatting before sending to the editorial desk for moderation.
+        {canDirectPublish
+          ? 'Tap "Preview Article" to verify formatting and video embeds before publishing live.'
+          : 'Tap "Preview Article" to verify formatting and video embeds before sending to the editorial desk for moderation.'}
       </Text>
 
       {/* Location Picker Modal */}
@@ -1167,8 +1186,15 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
               <Ionicons name="arrow-back" size={22} color={colors.text} />
               <Text style={[styles.previewBackText, { color: colors.text }]}>Back to Edit</Text>
             </Pressable>
-            <View style={styles.previewBadge}>
-              <Text style={styles.previewBadgeText}>READER PREVIEW</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={canDirectPublish ? styles.previewBadgeLive : styles.previewBadge}>
+                <Text style={canDirectPublish ? styles.previewBadgeLiveText : styles.previewBadgeText}>
+                  {canDirectPublish ? 'DIRECT PUBLISH' : 'PENDING APPROVAL'}
+                </Text>
+              </View>
+              <View style={styles.previewBadge}>
+                <Text style={styles.previewBadgeText}>READER PREVIEW</Text>
+              </View>
             </View>
           </View>
 
@@ -1296,6 +1322,102 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
                         ) : null}
                       </View>
                     ) : null
+                  case 'YOUTUBE': {
+                    const rawUrl = block.embedUrl || block.url || ''
+                    const ytId = videoIdFromUrl(rawUrl) || (rawUrl.length === 11 ? rawUrl : null)
+                    if (ytId) {
+                      return (
+                        <View key={block.id} style={styles.previewYtWrap}>
+                          <YouTubePlayer videoId={ytId} showOpenButton />
+                          {block.title ? (
+                            <Text style={[styles.previewYtTitle, { color: colors.textMuted }]}>
+                              {block.title}
+                            </Text>
+                          ) : null}
+                        </View>
+                      )
+                    }
+                    if (rawUrl) {
+                      return (
+                        <View key={block.id} style={[styles.previewYtFallback, { backgroundColor: colors.surfaceContainer, borderColor: colors.border }]}>
+                          <Ionicons name="logo-youtube" size={22} color="#ff0000" />
+                          <Text style={[styles.previewYtFallbackText, { color: colors.text }]}>
+                            {block.title || rawUrl}
+                          </Text>
+                        </View>
+                      )
+                    }
+                    return null
+                  }
+                  case 'VIDEO': {
+                    const rawUrl = block.url || block.embedUrl || ''
+                    const ytId = videoIdFromUrl(rawUrl)
+                    if (ytId) {
+                      return (
+                        <View key={block.id} style={styles.previewYtWrap}>
+                          <YouTubePlayer videoId={ytId} showOpenButton />
+                          {block.caption ? (
+                            <Text style={[styles.previewYtTitle, { color: colors.textMuted }]}>
+                              {block.caption}
+                            </Text>
+                          ) : null}
+                        </View>
+                      )
+                    }
+                    if (rawUrl) {
+                      return (
+                        <View key={block.id} style={styles.previewVideoWrap}>
+                          <Image
+                            source={{ uri: mediaUrl(rawUrl) || '' }}
+                            style={styles.previewVideoThumb}
+                            resizeMode="cover"
+                          />
+                          <View style={styles.previewVideoBadge}>
+                            <Ionicons name="play-circle" size={40} color="#fff" />
+                          </View>
+                          {block.caption ? (
+                            <Text style={[styles.previewBlockCaption, { color: colors.textLight }]}>
+                              {block.caption}
+                            </Text>
+                          ) : null}
+                        </View>
+                      )
+                    }
+                    return null
+                  }
+                  case 'EMBED': {
+                    const rawUrl = block.embedUrl || block.url || ''
+                    const ytId = videoIdFromUrl(rawUrl)
+                    if (ytId) {
+                      return (
+                        <View key={block.id} style={styles.previewYtWrap}>
+                          <YouTubePlayer videoId={ytId} showOpenButton />
+                          {block.title ? (
+                            <Text style={[styles.previewYtTitle, { color: colors.textMuted }]}>
+                              {block.title}
+                            </Text>
+                          ) : null}
+                        </View>
+                      )
+                    }
+                    return null
+                  }
+                  case 'GALLERY': {
+                    const items = block.items || []
+                    if (!items.length) return null
+                    return (
+                      <View key={block.id} style={styles.previewGalleryWrap}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                          {items.map((it) => (
+                            <View key={it.id} style={styles.previewGalleryItem}>
+                              <Image source={{ uri: mediaUrl(it.url) }} style={styles.previewGalleryImg} resizeMode="cover" />
+                              <ArticleWatermark compact />
+                            </View>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )
+                  }
                   case 'TABLE': {
                     const t = block.tableData
                     if (!t || (!t.headers?.length && !t.rows?.length)) return null
@@ -1377,17 +1499,19 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
               <Text style={[styles.previewBtnOutlineText, { color: colors.text }]}>Edit</Text>
             </Pressable>
             <Pressable
-              style={[styles.previewBtnSubmit, { backgroundColor: colors.primary }]}
-              onPress={() => save('PENDING_REVIEW')}
+              style={[styles.previewBtnSubmit, { backgroundColor: canDirectPublish ? '#DC2626' : colors.primary }]}
+              onPress={() => save(targetPublishStatus)}
               disabled={busy}
             >
               {busy ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <>
-                  <Ionicons name="paper-plane" size={18} color="#fff" />
+                  <Ionicons name={canDirectPublish ? 'flash' : 'paper-plane'} size={18} color="#fff" />
                   <Text style={styles.previewBtnSubmitText}>
-                    {editing ? 'Submit Changes' : 'Submit for Editorial Review 🚀'}
+                    {canDirectPublish
+                      ? (editing ? 'Update & Publish Live 🚀' : 'Publish Story Live 🚀')
+                      : (editing ? 'Submit Changes' : 'Submit for Editorial Review 🚀')}
                   </Text>
                 </>
               )}
@@ -1569,6 +1693,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   previewBadgeText: { fontSize: 10, fontWeight: '800', color: '#D97706' },
+  previewBadgeLive: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  previewBadgeLiveText: { fontSize: 10, fontWeight: '800', color: '#15803D' },
   previewMetaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   previewCatPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   previewCatText: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
@@ -1603,6 +1734,66 @@ const styles = StyleSheet.create({
   previewBlockImgBox: { position: 'relative', width: '100%', height: 180, borderRadius: 10, overflow: 'hidden' },
   previewBlockImg: { width: '100%', height: '100%' },
   previewBlockCaption: { fontSize: 11, textAlign: 'center', marginTop: 4 },
+  previewYtWrap: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginVertical: 12,
+    backgroundColor: '#000',
+  },
+  previewYtTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  previewYtFallback: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginVertical: 10,
+  },
+  previewYtFallbackText: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+  previewVideoWrap: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginVertical: 12,
+    backgroundColor: '#000',
+    position: 'relative',
+  },
+  previewVideoThumb: {
+    width: '100%',
+    height: '100%',
+  },
+  previewVideoBadge: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  previewGalleryWrap: {
+    marginVertical: 12,
+  },
+  previewGalleryItem: {
+    width: 240,
+    height: 160,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  previewGalleryImg: {
+    width: '100%',
+    height: '100%',
+  },
   previewDivider: { borderTopWidth: 1, borderStyle: 'dashed', marginVertical: 12 },
   previewTagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 18 },
   previewTagPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },

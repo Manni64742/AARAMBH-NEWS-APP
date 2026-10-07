@@ -12,6 +12,7 @@ import { useToast } from '../../context/ToastContext'
 import { errorMessage } from '../../api/client'
 import { mediaUrl } from '../../config'
 import { AdaptiveImage } from '../AdaptiveImage'
+import { videoIdFromUrl } from '../../utils/youtube'
 
 const TOOLBAR_BLOCKS: Array<{ type: ArticleBlockType; label: string; icon: any }> = [
   { type: 'TEXT', label: 'PARAGRAPH', icon: 'document-text-outline' },
@@ -244,18 +245,32 @@ export default function ArticleBlockEditor({
             />
           </View>
         )
-      case 'YOUTUBE':
+      case 'YOUTUBE': {
+        const rawUrl = block.embedUrl || block.url || ''
+        const ytId = videoIdFromUrl(rawUrl)
         return (
           <View>
             <TextInput
               style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-              value={block.embedUrl || ''}
-              onChangeText={(v) => updateBlock(index, { embedUrl: v })}
+              value={rawUrl}
+              onChangeText={(v) => updateBlock(index, { embedUrl: v, url: v })}
               placeholder="Paste YouTube Video URL (e.g. https://youtu.be/...)"
               placeholderTextColor={colors.textLight}
               autoCapitalize="none"
               autoCorrect={false}
             />
+            {ytId ? (
+              <View style={styles.editorYtThumbBox}>
+                <Image
+                  source={{ uri: `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` }}
+                  style={styles.editorYtThumbImg}
+                  contentFit="cover"
+                />
+                <View style={styles.editorYtThumbOverlay}>
+                  <Ionicons name="logo-youtube" size={34} color="#ff0000" />
+                </View>
+              </View>
+            ) : null}
             <TextInput
               style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
               value={block.title || ''}
@@ -265,6 +280,7 @@ export default function ArticleBlockEditor({
             />
           </View>
         )
+      }
       case 'DIVIDER':
         return (
           <View style={[styles.divider, { borderColor: colors.border }]}>
@@ -942,5 +958,24 @@ const styles = StyleSheet.create({
   tableCellInput: {
     fontSize: 12,
     padding: 2,
+  },
+  editorYtThumbBox: {
+    marginVertical: 8,
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#000',
+  },
+  editorYtThumbImg: {
+    width: '100%',
+    height: '100%',
+  },
+  editorYtThumbOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
 })
