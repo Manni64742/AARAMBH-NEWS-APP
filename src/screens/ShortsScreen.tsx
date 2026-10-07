@@ -1,9 +1,23 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Dimensions, FlatList, Platform, Pressable, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native'
+import {
+  AppState,
+  Dimensions,
+  FlatList,
+  Platform,
+  Pressable,
+  RefreshControl,
+  Share,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import { ScaledText as Text } from '../components/ScaledText'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
+import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useIsFocused } from '@react-navigation/native'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
@@ -19,25 +33,53 @@ import { videoIdFromUrl, youtubeThumb } from '../utils/youtube'
 
 const { height } = Dimensions.get('window')
 
-function NativeVideoPlayer({ source, active }: { source: string; active: boolean }) {
-  const player = useVideoPlayer(active && source ? (mediaUrl(source) as any) : null, (p) => {
+function NativeVideoPlayer({
+  source,
+  isLoaded,
+  isPlaying,
+}: {
+  source: string
+  isLoaded: boolean
+  isPlaying: boolean
+}) {
+  const resolvedSource = isLoaded && source ? (mediaUrl(source) as any) : null
+  const player = useVideoPlayer(resolvedSource, (p) => {
     p.loop = true
-    if (active) p.play()
+    if (isPlaying) {
+      p.play()
+    }
   })
 
   useEffect(() => {
-    if (active && source) player.play()
-    else player.pause()
-  }, [active, source, player])
+    if (!player) return
+    if (isPlaying && isLoaded) {
+      player.play()
+    } else {
+      player.pause()
+    }
+  }, [isPlaying, isLoaded, player])
 
   return (
-    <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      nativeControls={false}
+    />
   )
 }
 
-function YouTubeReelPlayer({ videoId, active }: { videoId: string; active: boolean }) {
+function YouTubeReelPlayer({
+  videoId,
+  isLoaded,
+  isPlaying,
+}: {
+  videoId: string
+  isLoaded: boolean
+  isPlaying: boolean
+}) {
   const thumb = youtubeThumb(videoId)
-  if (!active) {
+  if (!isLoaded) {
     return (
       <View style={StyleSheet.absoluteFill}>
         {thumb ? (
@@ -50,12 +92,30 @@ function YouTubeReelPlayer({ videoId, active }: { videoId: string; active: boole
   }
   return (
     <View style={StyleSheet.absoluteFill}>
-      <YouTubePlayer videoId={videoId} autoplay={true} active={active} />
+      <YouTubePlayer videoId={videoId} autoplay={isPlaying} active={isPlaying} />
     </View>
   )
 }
 
-function ReelItem({ item, active, onLike }: { item: ContentItem; active: boolean; onLike: () => void }) {
+function ReelItem({
+  item,
+  isCurrent,
+  isPlaying,
+  onTogglePlay,
+  onLike,
+  isLiked,
+  likeCount,
+  onShare,
+}: {
+  item: ContentItem
+  isCurrent: boolean
+  isPlaying: boolean
+  onTogglePlay: () => void
+  onLike: () => void
+  isLiked: boolean
+  likeCount: number
+  onShare: () => void
+}) {
   const rawUrl =
     item.shortVideoPayload?.videoUrl ||
     item.videoPayload?.videoUrl ||
@@ -69,10 +129,10 @@ function ReelItem({ item, active, onLike }: { item: ContentItem; active: boolean
     videoIdFromUrl(rawUrl)
 
   useEffect(() => {
-    if (active && item._id) {
+    if (isPlaying && item._id) {
       contentApi.recordView(item._id).catch(() => {})
     }
-  }, [active, item._id])
+  }, [isPlaying, item._id])
 
   if (!rawUrl && !ytId) return null
 
@@ -89,10 +149,22 @@ function ReelItem({ item, active, onLike }: { item: ContentItem; active: boolean
   return (
     <View style={styles.reel}>
       {ytId ? (
-        <YouTubeReelPlayer videoId={ytId} active={active} />
+        <YouTubeReelPlayer videoId={ytId} isLoaded={isCurrent} isPlaying={isPlaying} />
       ) : (
-        <NativeVideoPlayer source={rawUrl} active={active} />
+        <Pressable onPress={onTogglePlay} style={StyleSheet.absoluteFill}>
+          <NativeVideoPlayer source={rawUrl} isLoaded={isCurrent} isPlaying={isPlaying} />
+        </Pressable>
       )}
+
+      {/* When paused on the current reel, display full tap-to-resume overlay with centered Play button */}
+      {isCurrent && !isPlaying ? (
+        <Pressable onPress={onTogglePlay} style={styles.pausedTapOverlay}>
+          <View style={styles.playCenterBtn}>
+            <Ionicons name="play" size={40} color="#ffffff" style={{ marginLeft: 4 }} />
+          </View>
+        </Pressable>
+      ) : null}
+
       <View style={styles.reelInfo} pointerEvents="box-none">
         <Text style={styles.reelCategory}>{categoryName}</Text>
         <Text style={styles.reelTitle} numberOfLines={3}>
@@ -103,12 +175,18 @@ function ReelItem({ item, active, onLike }: { item: ContentItem; active: boolean
         </Text>
       </View>
       <View style={styles.actions} pointerEvents="box-none">
-        <TouchableOpacity onPress={onLike} hitSlop={10} style={{ alignItems: 'center' }}>
-          <Text style={styles.actionIcon}>{item.metrics?.likes ? '❤️' : '🤍'}</Text>
-          <Text style={styles.actionCount}>{item.metrics?.likes || 0}</Text>
+        <TouchableOpacity onPress={onLike} hitSlop={12} style={{ alignItems: 'center' }}>
+          <Ionicons
+            name={isLiked ? 'heart' : 'heart-outline'}
+            size={32}
+            color={isLiked ? '#e11d48' : '#ffffff'}
+          />
+          <Text style={[styles.actionCount, isLiked && { color: '#fb7185', fontWeight: 'bold' }]}>
+            {likeCount}
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity hitSlop={10} style={{ alignItems: 'center' }}>
-          <Text style={styles.actionIcon}>🔖</Text>
+        <TouchableOpacity onPress={onShare} hitSlop={12} style={{ alignItems: 'center', marginTop: 8 }}>
+          <Ionicons name="share-social-outline" size={26} color="#ffffff" />
           <Text style={styles.actionCount}>Share</Text>
         </TouchableOpacity>
       </View>
@@ -116,9 +194,47 @@ function ReelItem({ item, active, onLike }: { item: ContentItem; active: boolean
   )
 }
 
-export default function ShortsScreen({ navigation, onBackToVideos }: any) {
+export default function ShortsScreen({
+  navigation,
+  onBackToVideos,
+  isTabFocused = true,
+}: {
+  navigation: any
+  onBackToVideos?: () => void
+  isTabFocused?: boolean
+}) {
   const { colors: tc, isDark } = useTheme()
   const { language } = useLanguage()
+  const isNavFocused = useIsFocused()
+  const [navListenerFocused, setNavListenerFocused] = useState(true)
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active')
+
+  useEffect(() => {
+    const unsubBlur = navigation?.addListener?.('blur', () => {
+      setNavListenerFocused(false)
+    })
+    const unsubFocus = navigation?.addListener?.('focus', () => {
+      setNavListenerFocused(true)
+    })
+    const appSub = AppState.addEventListener('change', (nextState) => {
+      setIsAppActive(nextState === 'active')
+    })
+    return () => {
+      unsubBlur?.()
+      unsubFocus?.()
+      appSub.remove()
+    }
+  }, [navigation])
+
+  const isScreenActive = isNavFocused && isTabFocused && navListenerFocused && isAppActive
+
+  const [pausedMap, setPausedMap] = useState<Record<string, boolean>>({})
+  const prevScreenActiveRef = useRef(isScreenActive)
+
+  const onTogglePlay = useCallback((id: string) => {
+    setPausedMap((prev) => ({ ...prev, [id]: !prev[id] }))
+  }, [])
+
   const load = useCallback(async (page: number) => {
     const res = await contentApi.list({ page, limit: 10, status: 'PUBLISHED', contentType: 'SHORT_VIDEO', language })
     const list = Array.isArray(res) ? res : (res?.data || [])
@@ -143,6 +259,17 @@ export default function ShortsScreen({ navigation, onBackToVideos }: any) {
   const [activeIndex, setActiveIndex] = useState(0)
   const listRef = useRef<FlatList>(null)
 
+  useEffect(() => {
+    // If the screen was active and becomes inactive, mark the current reel as paused so it won't auto-play on return
+    if (prevScreenActiveRef.current && !isScreenActive) {
+      const currentItem = feed.items[activeIndex]
+      if (currentItem?._id) {
+        setPausedMap((prev) => ({ ...prev, [currentItem._id]: true }))
+      }
+    }
+    prevScreenActiveRef.current = isScreenActive
+  }, [isScreenActive, activeIndex, feed.items])
+
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems && viewableItems.length > 0) {
       const visibleItem = viewableItems.find((v: any) => v.isViewable) || viewableItems[0]
@@ -156,6 +283,11 @@ export default function ShortsScreen({ navigation, onBackToVideos }: any) {
     itemVisiblePercentThreshold: 60,
   }).current
 
+  const { user } = useAuth()
+  const { error } = useToast()
+  const [userLikedMap, setUserLikedMap] = useState<Record<string, boolean>>({})
+  const [likeCountMap, setLikeCountMap] = useState<Record<string, number>>({})
+
   const handleScroll = useCallback(
     (e: any) => {
       const offsetY = e.nativeEvent.contentOffset.y
@@ -167,12 +299,82 @@ export default function ShortsScreen({ navigation, onBackToVideos }: any) {
     [activeIndex]
   )
 
-  const onLike = async (item: ContentItem) => {
+  // Pre-fetch and track like status for visible and neighboring reels
+  useEffect(() => {
+    if (!user || !feed.items.length) return
+    const indicesToCheck = [activeIndex, activeIndex + 1, activeIndex - 1].filter(
+      (idx) => idx >= 0 && idx < feed.items.length
+    )
+    indicesToCheck.forEach((idx) => {
+      const item = feed.items[idx]
+      if (item?._id && userLikedMap[item._id] === undefined) {
+        interactionApi
+          .status(item._id)
+          .then((st: any) => {
+            if (st) {
+              setUserLikedMap((prev) => ({ ...prev, [item._id]: Boolean(st.liked) }))
+              if (typeof st.likes === 'number') {
+                setLikeCountMap((prev) => ({ ...prev, [item._id]: st.likes }))
+              }
+            }
+          })
+          .catch(() => {})
+      }
+    })
+  }, [user, activeIndex, feed.items, userLikedMap])
+
+  const onLike = useCallback(
+    async (item: ContentItem) => {
+      if (!user) {
+        error('कृपया लाइक करने के लिए लॉगिन करें / Please login to like')
+        navigation.navigate('Login')
+        return
+      }
+
+      const itemId = item._id
+      const currentlyLiked = Boolean(userLikedMap[itemId])
+      const currentLikes =
+        typeof likeCountMap[itemId] === 'number'
+          ? likeCountMap[itemId]
+          : item.metrics?.likes || 0
+
+      const nextLiked = !currentlyLiked
+      const nextLikes = Math.max(0, currentLikes + (nextLiked ? 1 : -1))
+
+      // Optimistic update — keep video playing seamlessly without reloading feed
+      setUserLikedMap((prev) => ({ ...prev, [itemId]: nextLiked }))
+      setLikeCountMap((prev) => ({ ...prev, [itemId]: nextLikes }))
+
+      try {
+        const res = await interactionApi.toggle(itemId, 'LIKE')
+        const returnedLikes = (res as any)?.data?.likes ?? (res as any)?.likes
+        if (typeof returnedLikes === 'number') {
+          setLikeCountMap((prev) => ({ ...prev, [itemId]: returnedLikes }))
+        }
+      } catch (err: any) {
+        // Rollback state if server request fails
+        setUserLikedMap((prev) => ({ ...prev, [itemId]: currentlyLiked }))
+        setLikeCountMap((prev) => ({ ...prev, [itemId]: currentLikes }))
+        error('लाइक अपडेट करने में समस्या हुई / Failed to update like')
+      }
+    },
+    [user, userLikedMap, likeCountMap, navigation, error]
+  )
+
+  const onShare = useCallback(async (item: ContentItem) => {
     try {
-      await interactionApi.toggle(item._id, 'LIKE')
-      feed.refresh()
+      const title =
+        typeof item.title === 'object'
+          ? (item.title as any)?.hi || (item.title as any)?.en || ''
+          : item.title || ''
+      const shareUrl = `https://aarambhnews.com/media?tab=SHORTS&id=${item._id}`
+      await Share.share({
+        title: title || 'Aarambh News Short',
+        message: `${title}\n\nआरंभ न्यूज़ पर देखें: ${shareUrl}`,
+        url: shareUrl,
+      })
     } catch {}
-  }
+  }, [])
 
   const handleBack = useCallback(() => {
     if (typeof onBackToVideos === 'function') {
@@ -278,9 +480,28 @@ export default function ShortsScreen({ navigation, onBackToVideos }: any) {
         windowSize={3}
         maxToRenderPerBatch={2}
         removeClippedSubviews={Platform.OS === 'android'}
-        renderItem={({ item, index }) => (
-          <ReelItem item={item} active={index === activeIndex} onLike={() => onLike(item)} />
-        )}
+        renderItem={({ item, index }) => {
+          const isCurrent = index === activeIndex
+          const isUserPaused = Boolean(pausedMap[item._id])
+          const isPlaying = isScreenActive && isCurrent && !isUserPaused
+
+          return (
+            <ReelItem
+              item={item}
+              isCurrent={isCurrent}
+              isPlaying={isPlaying}
+              onTogglePlay={() => onTogglePlay(item._id)}
+              onLike={() => onLike(item)}
+              isLiked={Boolean(userLikedMap[item._id])}
+              likeCount={
+                typeof likeCountMap[item._id] === 'number'
+                  ? likeCountMap[item._id]
+                  : item.metrics?.likes || 0
+              }
+              onShare={() => onShare(item)}
+            />
+          )
+        }}
         getItemLayout={(_, index) => ({ length: height, offset: height * index, index })}
         ListEmptyComponent={
           feed.loading ? null : feed.error ? (
@@ -404,5 +625,27 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontFamily: fonts.inter[600],
+  },
+  pausedTapOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
+  },
+  playCenterBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
   },
 })

@@ -14,7 +14,7 @@ interface YouTubePlayerProps {
 export function YouTubePlayer({
   videoId,
   showOpenButton = false,
-  autoplay = true,
+  autoplay = false,
   active = true,
 }: YouTubePlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -27,13 +27,13 @@ export function YouTubePlayer({
         JSON.stringify({ event: 'command', func: 'pauseVideo', args: '' }),
         '*'
       )
-    } else {
+    } else if (autoplay) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({ event: 'command', func: 'playVideo', args: '' }),
         '*'
       )
     }
-  }, [active])
+  }, [active, autoplay])
 
   useEffect(() => {
     return () => {

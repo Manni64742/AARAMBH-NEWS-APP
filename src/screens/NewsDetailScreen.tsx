@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { useVideoPlayer, VideoView } from 'expo-video'
-import { useRoute, useNavigation } from '@react-navigation/native'
+import { useRoute, useNavigation, useIsFocused } from '@react-navigation/native'
 import { commentApi, contentApi, interactionApi, reporterApi, userApi } from '../api/endpoints'
 import { ArticleBlock, CommentItem, ContentItem, ReporterPublicProfile, TableData } from '../types'
 import { colors, fonts, fontFor, radius } from '../theme'
@@ -1071,6 +1071,13 @@ export default function NewsDetailScreen() {
   const rawVideo = item?.shortVideoPayload?.videoUrl || item?.videoPayload?.videoUrl
   const videoSrc = rawVideo ? mediaUrl(rawVideo) : null
   const videoPlayer = useVideoPlayer(item && videoSrc ? (videoSrc as any) : null)
+  const isScreenFocused = useIsFocused()
+
+  useEffect(() => {
+    if (!isScreenFocused && videoPlayer) {
+      videoPlayer.pause()
+    }
+  }, [isScreenFocused, videoPlayer])
   const extractFirstBodyImage = (blocks?: any[], contentHtml?: string) => {
     if (Array.isArray(blocks)) {
       for (const b of blocks) {
@@ -1192,7 +1199,7 @@ export default function NewsDetailScreen() {
           {isVideoArticle ? (
             ytVideoId ? (
               <View style={styles.ytHeroWrap}>
-                <YouTubePlayer videoId={ytVideoId} showOpenButton />
+                <YouTubePlayer videoId={ytVideoId} showOpenButton active={isScreenFocused} />
               </View>
             ) : videoSrc ? (
               <VideoView player={videoPlayer} style={styles.hero} contentFit="contain" />
@@ -1262,7 +1269,7 @@ export default function NewsDetailScreen() {
             </View>
           ) : ytVideoId ? (
             <View style={styles.ytHeroWrap}>
-              <YouTubePlayer videoId={ytVideoId} showOpenButton />
+              <YouTubePlayer videoId={ytVideoId} showOpenButton active={isScreenFocused} />
             </View>
           ) : videoSrc ? (
             <VideoView player={videoPlayer} style={styles.hero} contentFit="contain" />

@@ -26,7 +26,7 @@ interface YouTubePlayerProps {
 export function YouTubePlayer({
   videoId,
   showOpenButton = false,
-  autoplay = true,
+  autoplay = false,
   active = true,
 }: YouTubePlayerProps) {
   const [loadError, setLoadError] = useState(false)
@@ -40,22 +40,28 @@ export function YouTubePlayer({
           var p = document.getElementById('ytplayer');
           if (p && p.contentWindow) {
             p.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+            p.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":[]}', '*');
+          }
+          var vids = document.getElementsByTagName('video');
+          for (var i = 0; i < vids.length; i++) {
+            vids[i].pause();
           }
         } catch(e) {}
       `
       webViewRef.current?.injectJavaScript(pauseScript)
-    } else {
+    } else if (autoplay) {
       const playScript = `
         try {
           var p = document.getElementById('ytplayer');
           if (p && p.contentWindow) {
             p.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+            p.contentWindow.postMessage('{"event":"command","func":"playVideo","args":[]}', '*');
           }
         } catch(e) {}
       `
       webViewRef.current?.injectJavaScript(playScript)
     }
-  }, [active])
+  }, [active, autoplay])
 
   useEffect(() => {
     return () => {
@@ -64,6 +70,11 @@ export function YouTubePlayer({
           var p = document.getElementById('ytplayer');
           if (p && p.contentWindow) {
             p.contentWindow.postMessage('{"event":"command","func":"stopVideo","args":""}', '*');
+            p.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+          }
+          var vids = document.getElementsByTagName('video');
+          for (var i = 0; i < vids.length; i++) {
+            vids[i].pause();
           }
         } catch(e) {}
       `

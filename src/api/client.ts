@@ -21,6 +21,8 @@ export async function setToken(token: string | null) {
 client.interceptors.request.use(async (config) => {
   const token = await getToken()
   if (token) config.headers.Authorization = `Bearer ${token}`
+  config.headers['Cache-Control'] = 'no-cache'
+  config.headers['Pragma'] = 'no-cache'
   return config
 })
 

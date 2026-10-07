@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Animated,
+  AppState,
   Easing,
   FlatList,
   LayoutChangeEvent,
@@ -326,7 +327,7 @@ export default function HomeScreen({ navigation }: any) {
       const existing = tabCacheRef.current.get(cacheKey) || { ts: Date.now() }
       tabCacheRef.current.set(cacheKey, { ...existing, headlines: r.data, ts: Date.now() })
     }).catch(() => setCategoryHeadlines([]))
-  }, [activeCategory, language])
+  }, [activeCategory, language, refreshTick])
 
   const topTabsScrollRef = useRef<ScrollView>(null)
   const touchStartX = useRef(0)
@@ -358,7 +359,7 @@ export default function HomeScreen({ navigation }: any) {
     })
 
     return () => { isMounted = false }
-  }, [language])
+  }, [language, refreshTick])
 
   useEffect(() => {
     const cleanup = loadHomeBundles()
@@ -595,7 +596,7 @@ Promise.all([
       .list({ status: 'PUBLISHED', state: location.state, limit: 8, sort: 'latest', language })
       .then((r) => setStateNews(r.data))
       .catch(() => setStateNews([]))
-  }, [location?.state, activeCategory, isMarket, language])
+  }, [location?.state, activeCategory, isMarket, language, refreshTick])
 
   useEffect(() => {
     if (!location?.city || isMarket || activeCategory) {
@@ -606,7 +607,7 @@ Promise.all([
       .list({ status: 'PUBLISHED', city: location.city, limit: 8, sort: 'latest', language })
       .then((r) => setCityNews(r.data))
       .catch(() => setCityNews([]))
-  }, [location?.city, activeCategory, isMarket, language])
+  }, [location?.city, activeCategory, isMarket, language, refreshTick])
 
   useEffect(() => {
     const params: Record<string, any> = { language }
@@ -621,6 +622,20 @@ Promise.all([
       })
       .catch(() => setLiveStreams([]))
   }, [language, location?.state, location?.city, location?.district])
+
+  // Listen for AppState transition to 'active' to refresh feeds for logged-out / guest users without app restart
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        tabCacheRef.current.clear()
+        setRefreshTick((t) => t + 1)
+        feed.refresh()
+      }
+    })
+    return () => {
+      subscription.remove()
+    }
+  }, [feed])
 
   const openNews = (item: ContentItem) => navigation.navigate('NewsDetail', { item })
   const handleBookmark = (id: string) => {

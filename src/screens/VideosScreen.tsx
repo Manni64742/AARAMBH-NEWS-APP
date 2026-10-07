@@ -14,6 +14,7 @@ import { mediaUrl, APP_LOGO } from '../config'
 import ShortsScreen from './ShortsScreen'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
+import { useIsFocused } from '@react-navigation/native'
 
 const VIDEO_FILTERS = [
   { key: '', label: 'All Videos' },
@@ -133,6 +134,7 @@ function MediaCard({ item }: { item: MediaCardItem }) {
 }
 
 export default function VideosScreen({ navigation }: any) {
+  const isTabFocused = useIsFocused()
   const { colors: themeColors, isDark } = useTheme()
   const { language } = useLanguage()
   const insets = useSafeAreaInsets()
@@ -251,7 +253,13 @@ export default function VideosScreen({ navigation }: any) {
   const feed = usePagedFeed<MediaCardItem>({ load })
 
   if (isShorts) {
-    return <ShortsScreen navigation={navigation} onBackToVideos={() => setMode('videos')} />
+    return (
+      <ShortsScreen
+        navigation={navigation}
+        isTabFocused={isTabFocused}
+        onBackToVideos={() => setMode('videos')}
+      />
+    )
   }
 
   const empty = feed.loading ? (
