@@ -156,7 +156,7 @@ export interface ReporterProfile {
   userId: User
   reporterId: string
   badge: string
-  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED'
+  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED'
   idProofType?: string
   idProofNumber?: string
   idProofDocumentUrl?: string

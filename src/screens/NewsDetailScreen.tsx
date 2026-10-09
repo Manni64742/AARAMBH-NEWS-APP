@@ -1068,24 +1068,29 @@ export default function NewsDetailScreen() {
   }
 
   const handleDeleteComment = (commentId: string) => {
+    const doDelete = async () => {
+      try {
+        await commentApi.delete(commentId)
+        setComments((prev) => prev.filter((c) => c._id !== commentId))
+        success('Comment deleted')
+      } catch (e) {
+        error(errorMessage(e, 'Failed to delete comment'))
+      }
+    }
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm('Are you sure you want to delete this comment?')) {
+        doDelete()
+      }
+      return
+    }
+
     Alert.alert(
       'Delete Comment',
       'Are you sure you want to delete this comment? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await commentApi.delete(commentId)
-              setComments((prev) => prev.filter((c) => c._id !== commentId))
-              success('Comment deleted')
-            } catch (e) {
-              error(errorMessage(e, 'Failed to delete comment'))
-            }
-          },
-        },
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
       ]
     )
   }
@@ -1097,6 +1102,15 @@ export default function NewsDetailScreen() {
       return
     }
 
+    const doReport = async (reason: string) => {
+      try {
+        await commentApi.report(commentId, reason)
+        success('Report submitted. Thank you for helping keep our community safe.')
+      } catch (e) {
+        error(errorMessage(e, 'Failed to report comment'))
+      }
+    }
+
     const reportReasons = [
       'Spam or Scam',
       'Harassment or Bullying',
@@ -1106,20 +1120,33 @@ export default function NewsDetailScreen() {
       'Other',
     ]
 
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') {
+        const choice = window.prompt(
+          `Report comment:\n1. Spam or Scam\n2. Harassment or Bullying\n3. Hate Speech / Abuse\n4. Inappropriate / Sexual Content\n5. Other\n\nEnter number (1-5):`,
+          '1'
+        )
+        if (choice) {
+          const map: Record<string, string> = {
+            '1': 'Spam or Scam',
+            '2': 'Harassment or Bullying',
+            '3': 'Hate Speech / Abuse',
+            '4': 'Inappropriate / Sexual Content',
+            '5': 'Other',
+          }
+          doReport(map[choice] || 'Inappropriate')
+        }
+      }
+      return
+    }
+
     Alert.alert(
       'Report Comment',
       'Select a reason for reporting this comment:',
       [
         ...reportReasons.map((reason) => ({
           text: reason,
-          onPress: async () => {
-            try {
-              await commentApi.report(commentId, reason)
-              success('Report submitted. Thank you for helping keep our community safe.')
-            } catch (e) {
-              error(errorMessage(e, 'Failed to report comment'))
-            }
-          },
+          onPress: () => doReport(reason),
         })),
         { text: 'Cancel', style: 'cancel' },
       ]

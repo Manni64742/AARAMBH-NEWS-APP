@@ -14,7 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as ImagePicker from 'expo-image-picker'
 import * as DocumentPicker from 'expo-document-picker'
 import { Ionicons } from '@expo/vector-icons'
-import { categoryApi, contentApi, locationApi, mediaApi } from '../../api/endpoints'
+import { categoryApi, contentApi, locationApi, mediaApi, reporterApi } from '../../api/endpoints'
 import {
   ArticleBlock,
   CategoryItem,
@@ -24,6 +24,7 @@ import {
   PriorityLevel,
   EditorialTone,
   SponsorType,
+  ReporterProfile,
 } from '../../types'
 import { useToast } from '../../context/ToastContext'
 import { useLocation } from '../../context/LocationContext'
@@ -96,6 +97,13 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
   const targetPublishStatus = canDirectPublish ? 'PUBLISHED' : 'PENDING_REVIEW'
   const editing = !!(route?.params?.item)
   const item: ContentItem | undefined = route?.params?.item
+  const [reporterProfile, setReporterProfile] = useState<ReporterProfile | null>(null)
+
+  useEffect(() => {
+    if (user?.role === 'REPORTER') {
+      reporterApi.profile().then(setReporterProfile).catch(() => {})
+    }
+  }, [user])
 
   const [contentType, setContentType] = useState<ContentType>(item?.contentType || 'ARTICLE')
   const [title, setTitle] = useState(item?.title || '')
@@ -278,6 +286,14 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
   }
 
   const save = async (status: 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED') => {
+    if (user?.role === 'REPORTER' && reporterProfile && reporterProfile.approvalStatus !== 'APPROVED') {
+      error(
+        reporterProfile.approvalStatus === 'SUSPENDED'
+          ? 'Your reporter privileges have been suspended. You cannot submit articles.'
+          : 'Your reporter profile is not approved yet.'
+      )
+      return
+    }
     if (!title.trim() || title.trim().length < 5) {
       error('Title is required (minimum 5 characters)')
       return
@@ -434,6 +450,17 @@ export default function SubmitNewsScreen({ navigation, route }: any) {
         <View style={[styles.statusBanner, { backgroundColor: colors.surfaceContainer, borderColor: colors.primary }]}>
           <Text style={[styles.statusText, { color: colors.textMuted }]}>
             Editing submission · Status: <Text style={{ color: colors.primary, fontWeight: '800' }}>{item.status.replace(/_/g, ' ')}</Text>
+          </Text>
+        </View>
+      ) : null}
+
+      {user?.role === 'REPORTER' && reporterProfile && reporterProfile.approvalStatus !== 'APPROVED' ? (
+        <View style={{ backgroundColor: '#FEF2F2', borderColor: '#F87171', borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Ionicons name="alert-circle" size={20} color="#DC2626" />
+          <Text style={{ flex: 1, color: '#991B1B', fontSize: 13, lineHeight: 18, fontWeight: '600' }}>
+            {reporterProfile.approvalStatus === 'SUSPENDED'
+              ? 'Your reporter privileges have been suspended/deactivated. Article publishing and submission is disabled.'
+              : 'Your reporter profile is pending review. Article submission is disabled.'}
           </Text>
         </View>
       ) : null}

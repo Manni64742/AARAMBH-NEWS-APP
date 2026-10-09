@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native'
+import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native'
 import Slider from '@react-native-community/slider'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { categoryApi, followApi, notificationApi, userApi } from '../api/endpoints'
@@ -96,28 +96,26 @@ export default function SettingsScreen({ navigation }: any) {
     }
   }
 
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
   const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'Deleting your account will permanently remove your profile, saved bookmarks, favorites, comments, and reading history. This action cannot be undone.\n\nAre you sure you want to proceed?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete Account',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await userApi.deleteAccount()
-              await logout()
-              success('Account deleted successfully')
-              navigation.navigate('Main', { screen: 'Home' })
-            } catch (e) {
-              error(errorMessage(e, 'Failed to delete account'))
-            }
-          },
-        },
-      ]
-    )
+    setDeleteModalVisible(true)
+  }
+
+  const confirmDeleteAccount = async () => {
+    setDeleting(true)
+    try {
+      await userApi.deleteAccount()
+      setDeleteModalVisible(false)
+      await logout()
+      success('Account deleted successfully')
+      navigation.navigate('Main', { screen: 'Home' })
+    } catch (e) {
+      error(errorMessage(e, 'Failed to delete account'))
+    } finally {
+      setDeleting(false)
+    }
   }
 
   if (loading) return <View style={[styles.center, { backgroundColor: colors.bg }]}><AarambhLoader size="lg" color={colors.primary} /></View>
@@ -125,11 +123,12 @@ export default function SettingsScreen({ navigation }: any) {
   const topPadding = 12
 
   return (
-    <ScrollView
-      style={[styles.safe, { backgroundColor: colors.bg }]}
-      contentContainerStyle={[styles.content, { paddingTop: topPadding }]}
-      scrollIndicatorInsets={{ top: topPadding }}
-    >
+    <View style={[styles.safe, { backgroundColor: colors.bg }]}>
+      <ScrollView
+        style={styles.safe}
+        contentContainerStyle={[styles.content, { paddingTop: topPadding }]}
+        scrollIndicatorInsets={{ top: topPadding }}
+      >
       <Text style={[styles.section, { color: colors.text }]}>Appearance</Text>
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.row}>
@@ -322,6 +321,56 @@ export default function SettingsScreen({ navigation }: any) {
         Aarambh News • v{Constants.expoConfig?.version || '1.0.3'} (Build #{Constants.expoConfig?.android?.versionCode || 4})
       </Text>
     </ScrollView>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!deleting) setDeleteModalVisible(false)
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => {
+              if (!deleting) setDeleteModalVisible(false)
+            }}
+          />
+          <View style={[styles.deleteModalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.deleteModalIconWrap}>
+              <Ionicons name="trash" size={28} color="#EF4444" />
+            </View>
+            <Text style={[styles.deleteModalTitle, { color: colors.text }]}>Delete Account Permanently?</Text>
+            <Text style={[styles.deleteModalDesc, { color: colors.textMuted }]}>
+              This action cannot be undone. All your profile information, reading history, saved articles, and comments will be permanently erased.
+            </Text>
+
+            <View style={styles.deleteModalActions}>
+              <Pressable
+                style={[styles.modalBtn, styles.modalCancelBtn, { backgroundColor: colors.surfaceVariant }]}
+                onPress={() => setDeleteModalVisible(false)}
+                disabled={deleting}
+              >
+                <Text style={[styles.modalCancelBtnText, { color: colors.text }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalBtn, styles.modalConfirmBtn, deleting && { opacity: 0.7 }]}
+                onPress={confirmDeleteAccount}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalConfirmBtnText}>Yes, Delete</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   )
 }
 
@@ -357,6 +406,75 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   deleteBtnText: {
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFill,
+  },
+  deleteModalCard: {
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: 'center',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+  },
+  deleteModalIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  deleteModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  deleteModalDesc: {
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  deleteModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelBtn: {},
+  modalCancelBtnText: {
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  modalConfirmBtn: {
+    backgroundColor: '#EF4444',
+  },
+  modalConfirmBtnText: {
+    color: '#fff',
     fontWeight: '800',
     fontSize: 14,
   },

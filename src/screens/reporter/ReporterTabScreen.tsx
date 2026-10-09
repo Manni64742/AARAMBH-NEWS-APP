@@ -76,18 +76,37 @@ export default function ReporterTabScreen({ navigation }: any) {
                 ? 'Your reporter application is pending review. You will be notified once approved.'
                 : profile?.approvalStatus === 'REJECTED'
                 ? `Application rejected: ${profile.rejectionReason || 'contact admin'}`
+                : profile?.approvalStatus === 'SUSPENDED'
+                ? 'Your reporter privileges have been suspended/deactivated by administration. You can view news articles, but cannot submit or publish new articles.'
                 : 'Create a reporter profile to submit news.'}
             </Text>
           </View>
         )}
 
         <View style={styles.grid}>
-          {actions.map((a) => (
-            <Pressable key={a.label} style={styles.actionCard} onPress={() => navigation.navigate(a.route)}>
-              <Ionicons name={a.icon as any} size={26} color={colors.primary} />
-              <Text style={[styles.actionLabel, { color: colors.textMuted }]}>{a.label}</Text>
-            </Pressable>
-          ))}
+          {actions.map((a) => {
+            const isRestrictedAction = a.route === 'SubmitNews' && profile?.approvalStatus !== 'APPROVED'
+            return (
+              <Pressable
+                key={a.label}
+                style={[styles.actionCard, isRestrictedAction && { opacity: 0.55 }]}
+                onPress={() => {
+                  if (isRestrictedAction) {
+                    error(
+                      profile?.approvalStatus === 'SUSPENDED'
+                        ? 'Your reporter account is suspended. You cannot submit articles.'
+                        : 'Your reporter profile is not approved yet.'
+                    )
+                    return
+                  }
+                  navigation.navigate(a.route)
+                }}
+              >
+                <Ionicons name={a.icon as any} size={26} color={isRestrictedAction ? colors.textLight : colors.primary} />
+                <Text style={[styles.actionLabel, { color: colors.textMuted }]}>{a.label}</Text>
+              </Pressable>
+            )
+          })}
         </View>
       </ScrollView>
     </View>
