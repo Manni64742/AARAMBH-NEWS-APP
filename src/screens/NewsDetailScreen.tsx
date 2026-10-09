@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Linking,
@@ -1066,6 +1067,65 @@ export default function NewsDetailScreen() {
     }
   }
 
+  const handleDeleteComment = (commentId: string) => {
+    Alert.alert(
+      'Delete Comment',
+      'Are you sure you want to delete this comment? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await commentApi.delete(commentId)
+              setComments((prev) => prev.filter((c) => c._id !== commentId))
+              success('Comment deleted')
+            } catch (e) {
+              error(errorMessage(e, 'Failed to delete comment'))
+            }
+          },
+        },
+      ]
+    )
+  }
+
+  const handleReportComment = (commentId: string) => {
+    if (!user) {
+      error('Please sign in to report a comment')
+      navigation.navigate('Login')
+      return
+    }
+
+    const reportReasons = [
+      'Spam or Scam',
+      'Harassment or Bullying',
+      'Hate Speech / Abuse',
+      'Inappropriate / Sexual Content',
+      'Misinformation',
+      'Other',
+    ]
+
+    Alert.alert(
+      'Report Comment',
+      'Select a reason for reporting this comment:',
+      [
+        ...reportReasons.map((reason) => ({
+          text: reason,
+          onPress: async () => {
+            try {
+              await commentApi.report(commentId, reason)
+              success('Report submitted. Thank you for helping keep our community safe.')
+            } catch (e) {
+              error(errorMessage(e, 'Failed to report comment'))
+            }
+          },
+        })),
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    )
+  }
+
   const isVideoArticle = (item?.contentType as any) === 'VIDEO' || item?.contentType === 'SHORT_VIDEO'
   const ytVideoId = item ? (item.youtubeId || (item.youtubeUrl ? videoIdFromUrl(item.youtubeUrl) : null)) : null
   const rawVideo = item?.shortVideoPayload?.videoUrl || item?.videoPayload?.videoUrl
@@ -1372,17 +1432,39 @@ export default function NewsDetailScreen() {
           {comments.length === 0 ? (
             <Text style={[styles.noComments, { color: themeColors.textLight }]}>Be the first to comment</Text>
           ) : (
-            comments.map((c) => (
-              <View key={c._id} style={styles.comment}>
-                <View style={styles.commentAvatar}>
-                  <Text style={styles.commentAvatarText}>{(c.userId?.name || 'U').charAt(0)}</Text>
+            comments.map((c) => {
+              const isOwn = !!(user?._id && (c.userId?._id === user._id || (c.userId as any) === user._id))
+              return (
+                <View key={c._id} style={styles.comment}>
+                  <View style={styles.commentAvatar}>
+                    <Text style={styles.commentAvatarText}>{(c.userId?.name || 'U').charAt(0)}</Text>
+                  </View>
+                  <View style={styles.commentBody}>
+                    <View style={styles.commentHeaderRow}>
+                      <Text style={[styles.commentAuthor, { color: themeColors.text }]}>{c.userId?.name || 'Reader'}</Text>
+                      {isOwn ? (
+                        <Pressable
+                          hitSlop={8}
+                          onPress={() => handleDeleteComment(c._id)}
+                          accessibilityLabel="Delete your comment"
+                        >
+                          <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                        </Pressable>
+                      ) : (
+                        <Pressable
+                          hitSlop={8}
+                          onPress={() => handleReportComment(c._id)}
+                          accessibilityLabel="Report comment"
+                        >
+                          <Ionicons name="flag-outline" size={14} color={themeColors.textLight} />
+                        </Pressable>
+                      )}
+                    </View>
+                    <Text style={[styles.commentText, { color: themeColors.textMuted }]}>{c.commentText}</Text>
+                  </View>
                 </View>
-                <View style={styles.commentBody}>
-                  <Text style={[styles.commentAuthor, { color: themeColors.text }]}>{c.userId?.name}</Text>
-                  <Text style={[styles.commentText, { color: themeColors.textMuted }]}>{c.commentText}</Text>
-                </View>
-              </View>
-            ))
+              )
+            })
           )}
           <View style={styles.commentInputRow}>
             <TextInput
@@ -1615,28 +1697,52 @@ export default function NewsDetailScreen() {
                   </Text>
                 </View>
               ) : (
-                comments.map((c) => (
-                  <View key={c._id} style={[styles.sheetCommentItem, { borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)' }]}>
-                    <View style={[styles.sheetCommentAvatar, { backgroundColor: themeColors.primarySoft }]}>
-                      <Text style={[styles.sheetCommentAvatarText, { color: themeColors.primary }]}>
-                        {(c.userId?.name || 'U').charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.sheetCommentBody}>
-                      <View style={styles.sheetCommentMetaRow}>
-                        <Text style={[styles.sheetCommentAuthor, { color: themeColors.text }]}>
-                          {c.userId?.name || 'Reader'}
-                        </Text>
-                        <Text style={[styles.sheetCommentTime, { color: themeColors.textLight }]}>
-                          {formatCommentTime(c.createdAt)}
+                comments.map((c) => {
+                  const isOwn = !!(user?._id && (c.userId?._id === user._id || (c.userId as any) === user._id))
+                  return (
+                    <View key={c._id} style={[styles.sheetCommentItem, { borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)' }]}>
+                      <View style={[styles.sheetCommentAvatar, { backgroundColor: themeColors.primarySoft }]}>
+                        <Text style={[styles.sheetCommentAvatarText, { color: themeColors.primary }]}>
+                          {(c.userId?.name || 'U').charAt(0).toUpperCase()}
                         </Text>
                       </View>
-                      <Text style={[styles.sheetCommentText, { color: themeColors.text }]}>
-                        {c.commentText}
-                      </Text>
+                      <View style={styles.sheetCommentBody}>
+                        <View style={styles.sheetCommentMetaRow}>
+                          <Text style={[styles.sheetCommentAuthor, { color: themeColors.text }]}>
+                            {c.userId?.name || 'Reader'}
+                          </Text>
+                          <View style={styles.commentActionGroup}>
+                            <Text style={[styles.sheetCommentTime, { color: themeColors.textLight }]}>
+                              {formatCommentTime(c.createdAt)}
+                            </Text>
+                            {isOwn ? (
+                              <Pressable
+                                hitSlop={8}
+                                onPress={() => handleDeleteComment(c._id)}
+                                accessibilityLabel="Delete your comment"
+                                style={styles.commentActionBtn}
+                              >
+                                <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                              </Pressable>
+                            ) : (
+                              <Pressable
+                                hitSlop={8}
+                                onPress={() => handleReportComment(c._id)}
+                                accessibilityLabel="Report comment"
+                                style={styles.commentActionBtn}
+                              >
+                                <Ionicons name="flag-outline" size={13} color={themeColors.textLight} />
+                              </Pressable>
+                            )}
+                          </View>
+                        </View>
+                        <Text style={[styles.sheetCommentText, { color: themeColors.text }]}>
+                          {c.commentText}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                ))
+                  )
+                })
               )}
             </ScrollView>
 
@@ -1844,6 +1950,7 @@ const styles = StyleSheet.create({
   commentAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.surfaceVariant, alignItems: 'center', justifyContent: 'center' },
   commentAvatarText: { fontWeight: '800', color: colors.textMuted },
   commentBody: { flex: 1, marginLeft: 10 },
+  commentHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
   commentAuthor: { fontFamily: fonts.inter[600], fontSize: 13, fontWeight: '700', color: colors.text },
   commentText: { fontFamily: fonts.inter[400], fontSize: 13, color: colors.textMuted, marginTop: 2, lineHeight: 18 },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
@@ -2057,6 +2164,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  commentActionGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  commentActionBtn: {
+    padding: 2,
   },
   sheetCommentAuthor: {
     fontFamily: fonts.inter[700],

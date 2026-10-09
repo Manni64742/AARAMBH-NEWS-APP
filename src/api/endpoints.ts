@@ -41,6 +41,8 @@ export const userApi = {
   clearHistory: async () => (await client.delete<ApiResponse<null>>('/users/history')).data,
   recordRead: async (contentId: string) =>
     (await client.post<ApiResponse<any>>(`/users/history/${contentId}`)).data,
+  deleteAccount: async () =>
+    (await client.delete<ApiResponse<{ deleted: boolean }>>('/users/account')).data,
 }
 
 export const contentApi = {
@@ -256,6 +258,10 @@ export const commentApi = {
   },
   add: async (contentId: string, commentText: string) =>
     (await client.post<ApiResponse<CommentItem>>('/comments', { contentId, commentText })).data.data,
+  delete: async (id: string) =>
+    (await client.delete<ApiResponse<{ deleted: boolean }>>(`/comments/${id}`)).data,
+  report: async (id: string, reason: string, description?: string) =>
+    (await client.post<ApiResponse<{ reported: boolean }>>(`/comments/${id}/report`, { reason, description })).data,
 }
 
 export const reporterApi = {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { ScaledText as Text } from '../../components/ScaledText'
 import { useTheme } from '../../context/ThemeContext'
 import { Image } from 'expo-image'
@@ -64,6 +64,23 @@ export default function LoginScreen({ navigation }: any) {
           secureTextEntry
         />
 
+        <View style={styles.forgotRow}>
+          <Pressable
+            onPress={() =>
+              Alert.alert(
+                'Forgot Password?',
+                'To reset your password, please email our support team at contact@aarambhnews.online or visit aarambhnews.online.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Email Support', onPress: () => Linking.openURL('mailto:contact@aarambhnews.online?subject=Password%20Reset%20Request') },
+                ]
+              )
+            }
+          >
+            <Text style={[styles.forgotText, { color: themeColors.primary }]}>Forgot password?</Text>
+          </Pressable>
+        </View>
+
         <Pressable style={[styles.button, busy && styles.buttonDisabled]} onPress={submit} disabled={busy}>
           <Text style={styles.buttonText}>{busy ? 'Signing in...' : 'Sign In'}</Text>
         </Pressable>
@@ -97,7 +114,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: colors.text,
+    marginBottom: 8,
+  },
+  forgotRow: {
+    alignItems: 'flex-end',
     marginBottom: 16,
+  },
+  forgotText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   button: {
     backgroundColor: colors.primary,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import Slider from '@react-native-community/slider'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -115,6 +115,22 @@ export default function ProfileScreen({ navigation }: any) {
                 </Text>
                 <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
               </View>
+            </Pressable>
+
+            <Pressable style={styles.menuRow} onPress={() => Linking.openURL('https://aarambhnews.online/privacy-policy')}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={colors.textMuted} />
+              <Text style={[styles.menuText, { color: colors.text }]}>
+                {language === 'hi' ? 'गोपनीयता नीति' : 'Privacy Policy'}
+              </Text>
+              <Ionicons name="open-outline" size={16} color={colors.textLight} />
+            </Pressable>
+
+            <Pressable style={styles.menuRow} onPress={() => Linking.openURL('https://aarambhnews.online/terms-of-service')}>
+              <Ionicons name="document-text-outline" size={20} color={colors.textMuted} />
+              <Text style={[styles.menuText, { color: colors.text }]}>
+                {language === 'hi' ? 'उपयोग की शर्तें' : 'Terms of Use & UGC'}
+              </Text>
+              <Ionicons name="open-outline" size={16} color={colors.textLight} />
             </Pressable>
           </View>
         </ScrollView>
@@ -324,6 +340,16 @@ export default function ProfileScreen({ navigation }: any) {
               </Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
             </View>
+          </Pressable>
+          <Pressable style={styles.menuRow} onPress={() => Linking.openURL('https://aarambhnews.online/privacy-policy')}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={colors.textMuted} />
+            <Text style={[styles.menuText, { color: colors.text }]}>{language === 'hi' ? 'गोपनीयता नीति' : 'Privacy Policy'}</Text>
+            <Ionicons name="open-outline" size={16} color={colors.textLight} />
+          </Pressable>
+          <Pressable style={styles.menuRow} onPress={() => Linking.openURL('https://aarambhnews.online/terms-of-service')}>
+            <Ionicons name="document-text-outline" size={20} color={colors.textMuted} />
+            <Text style={[styles.menuText, { color: colors.text }]}>{language === 'hi' ? 'उपयोग की शर्तें' : 'Terms of Use & UGC'}</Text>
+            <Ionicons name="open-outline" size={16} color={colors.textLight} />
           </Pressable>
         </View>
 

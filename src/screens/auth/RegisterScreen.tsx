@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
+import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import { ScaledText as Text } from '../../components/ScaledText'
 import { useTheme } from '../../context/ThemeContext'
 import { authApi } from '../../api/endpoints'
 import { errorMessage, setToken } from '../../api/client'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
+import { Ionicons } from '@expo/vector-icons'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { colors } from '../../theme'
 
@@ -16,6 +17,7 @@ export default function RegisterScreen({ navigation }: any) {
   const [name, setName] = useState('')
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
+  const [agreedTerms, setAgreedTerms] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const submit = async () => {
@@ -23,6 +25,10 @@ export default function RegisterScreen({ navigation }: any) {
     const trimmedIdentifier = identifier.trim()
     if (!trimmedName || !trimmedIdentifier || password.length < 6) {
       error('Fill all fields (password min 6 chars)')
+      return
+    }
+    if (!agreedTerms) {
+      error('Please agree to the Terms of Use and Privacy Policy')
       return
     }
     setBusy(true)
@@ -80,6 +86,34 @@ export default function RegisterScreen({ navigation }: any) {
           secureTextEntry
         />
 
+        {/* Play Store UGC Requirement: Terms and Privacy Policy acceptance */}
+        <Pressable
+          style={styles.checkboxRow}
+          onPress={() => setAgreedTerms(!agreedTerms)}
+        >
+          <Ionicons
+            name={agreedTerms ? 'checkbox' : 'square-outline'}
+            size={20}
+            color={agreedTerms ? themeColors.primary : themeColors.textLight}
+          />
+          <Text style={[styles.checkboxLabel, { color: themeColors.textMuted }]}>
+            I agree to the{' '}
+            <Text
+              style={[styles.linkText, { color: themeColors.primary }]}
+              onPress={() => Linking.openURL('https://aarambhnews.online/terms-of-service')}
+            >
+              Terms of Use
+            </Text>
+            {' '}and{' '}
+            <Text
+              style={[styles.linkText, { color: themeColors.primary }]}
+              onPress={() => Linking.openURL('https://aarambhnews.online/privacy-policy')}
+            >
+              Privacy Policy
+            </Text>
+          </Text>
+        </Pressable>
+
         <Pressable style={[styles.button, busy && styles.buttonDisabled]} onPress={submit} disabled={busy}>
           <Text style={styles.buttonText}>{busy ? 'Creating...' : 'Create Account'}</Text>
         </Pressable>
@@ -110,5 +144,8 @@ const styles = StyleSheet.create({
   button: { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, marginTop: 4, gap: 10 },
+  checkboxLabel: { flex: 1, fontSize: 13, lineHeight: 18 },
+  linkText: { fontWeight: '700', textDecorationLine: 'underline' },
   hint: { color: colors.textMuted, fontSize: 12, marginTop: 16, lineHeight: 18 },
 })

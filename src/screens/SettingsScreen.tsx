@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native'
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native'
 import Slider from '@react-native-community/slider'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { categoryApi, followApi, notificationApi, userApi } from '../api/endpoints'
@@ -20,7 +20,7 @@ import { registerForPushNotificationsAsync } from '../services/notificationServi
 const GUEST_NOTIFICATIONS_KEY = 'aarambh_guest_notifications'
 
 export default function SettingsScreen({ navigation }: any) {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const { language, setLanguage } = useLanguage()
   const { colors, fontMode, setFontMode, isDark, toggleTheme } = useTheme()
   const { success, error } = useToast()
@@ -94,6 +94,30 @@ export default function SettingsScreen({ navigation }: any) {
     } catch (e) {
       error(errorMessage(e))
     }
+  }
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Deleting your account will permanently remove your profile, saved bookmarks, favorites, comments, and reading history. This action cannot be undone.\n\nAre you sure you want to proceed?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await userApi.deleteAccount()
+              await logout()
+              success('Account deleted successfully')
+              navigation.navigate('Main', { screen: 'Home' })
+            } catch (e) {
+              error(errorMessage(e, 'Failed to delete account'))
+            }
+          },
+        },
+      ]
+    )
   }
 
   if (loading) return <View style={[styles.center, { backgroundColor: colors.bg }]}><AarambhLoader size="lg" color={colors.primary} /></View>
@@ -240,6 +264,60 @@ export default function SettingsScreen({ navigation }: any) {
         </>
       ) : null}
 
+      <Text style={[styles.section, { color: colors.text }]}>Legal & Information</Text>
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Pressable
+          style={styles.row}
+          onPress={() => Linking.openURL('https://aarambhnews.online/privacy-policy')}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+            <Text style={[styles.rowText, { color: colors.text }]}>Privacy Policy</Text>
+          </View>
+          <Ionicons name="open-outline" size={16} color={colors.textLight} />
+        </Pressable>
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        <Pressable
+          style={styles.row}
+          onPress={() => Linking.openURL('https://aarambhnews.online/terms-of-service')}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+            <Text style={[styles.rowText, { color: colors.text }]}>Terms of Use & UGC</Text>
+          </View>
+          <Ionicons name="open-outline" size={16} color={colors.textLight} />
+        </Pressable>
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        <Pressable
+          style={styles.row}
+          onPress={() => Linking.openURL('mailto:contact@aarambhnews.online')}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Ionicons name="mail-outline" size={18} color={colors.primary} />
+            <Text style={[styles.rowText, { color: colors.text }]}>Contact & Support</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textLight} />
+        </Pressable>
+      </View>
+
+      {user ? (
+        <>
+          <Text style={[styles.section, { color: baseColors.danger }]}>Account Management</Text>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: `${baseColors.danger}40`, paddingVertical: 12 }]}>
+            <Text style={{ fontSize: 12, color: colors.textMuted, marginBottom: 10 }}>
+              Permanently delete your Aarambh News account and all associated profile, reading history, and saved data.
+            </Text>
+            <Pressable
+              style={[styles.deleteBtn, { backgroundColor: `${baseColors.danger}15`, borderColor: baseColors.danger }]}
+              onPress={handleDeleteAccount}
+            >
+              <Ionicons name="trash-outline" size={18} color={baseColors.danger} />
+              <Text style={[styles.deleteBtnText, { color: baseColors.danger }]}>Delete Account</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : null}
+
       <Text style={{ textAlign: 'center', fontSize: 12, color: colors.textLight, marginTop: 24, marginBottom: 12 }}>
         Aarambh News • v{Constants.expoConfig?.version || '1.0.3'} (Build #{Constants.expoConfig?.android?.versionCode || 4})
       </Text>
@@ -268,4 +346,18 @@ const styles = StyleSheet.create({
   input: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, marginBottom: 10 },
   btn: { backgroundColor: baseColors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
   btnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  deleteBtnText: {
+    fontWeight: '800',
+    fontSize: 14,
+  },
 })
