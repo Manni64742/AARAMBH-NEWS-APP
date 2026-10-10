@@ -285,11 +285,16 @@ export const reporterApi = {
 }
 
 export const advertisementApi = {
-  getActive: async (placement?: string, placements?: string[]): Promise<ActiveAdvertisementItem | null> => {
+  getActive: async (
+    placement?: string,
+    placements?: string[],
+    excludeIds?: string[]
+  ): Promise<ActiveAdvertisementItem | null> => {
     try {
       const params: Record<string, any> = { _t: Date.now() }
       if (placement) params.placement = placement
       if (placements && placements.length > 0) params.placements = placements.join(',')
+      if (excludeIds && excludeIds.length > 0) params.excludeIds = excludeIds.join(',')
       const res = await client.get<ApiResponse<any>>('/advertisements/active', { params })
       return res.data?.data || null
     } catch (err) {

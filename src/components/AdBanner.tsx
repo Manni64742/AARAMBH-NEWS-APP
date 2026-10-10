@@ -19,15 +19,19 @@ import { getAdSdk } from './ads/getAdSdk'
 import { advertisementApi } from '../api/endpoints'
 import { ActiveAdvertisementItem } from '../types'
 
-// Simple in-memory cache with 3-minute TTL to prevent re-fetching on small scrolls
+// In-memory cache to prevent excessive re-fetching on rapid micro-scrolls
 const adCache: Record<string, { ad: ActiveAdvertisementItem | null; timestamp: number }> = {}
-const CACHE_TTL_MS = 3 * 60 * 1000
+const CACHE_TTL_MS = 30 * 1000
+
+// In-memory set of ad IDs rendered recently to prevent showing the exact same ad across multiple slots on the screen
+const recentlyDisplayedAdIds = new Set<string>()
 
 export function clearAdCache(slot?: string) {
   if (slot) {
     delete adCache[slot]
   } else {
     Object.keys(adCache).forEach((k) => delete adCache[k])
+    recentlyDisplayedAdIds.clear()
   }
 }
 
@@ -303,14 +307,16 @@ export const AdBanner: React.FC<AdBannerProps> = ({
       }
 
       try {
-        const ad = await advertisementApi.getActive(slot)
+        const excludeList = Array.from(recentlyDisplayedAdIds).slice(-6)
+        const ad = await advertisementApi.getActive(slot, undefined, excludeList)
         if (isMounted) {
+          if (ad?._id) {
+            recentlyDisplayedAdIds.add(ad._id)
+            advertisementApi.recordImpression(ad._id)
+          }
           adCache[slot] = { ad, timestamp: Date.now() }
           setActiveAd(ad)
           setLoaded(true)
-          if (ad?._id) {
-            advertisementApi.recordImpression(ad._id)
-          }
         }
       } catch (err) {
         if (isMounted) {
